@@ -19,7 +19,6 @@ import {
   uuid,
   type AttendanceStatus,
   type LeaveType,
-  type PersonType,
   type ReportType,
 } from '@nsut/shared';
 import { one } from '../db/pool';
@@ -54,7 +53,6 @@ export const reportQuerySchema = z.object({
   to: isoDate.optional(),
   personId: uuid.optional(),
   type: z.enum(PERSON_TYPES).optional(),
-  departmentId: uuid.optional(),
   activityId: uuid.optional(),
   status: z.string().max(30).optional(),
   q: z.string().max(100).optional(),
@@ -62,16 +60,11 @@ export const reportQuerySchema = z.object({
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 
 const pct = (v: number | null) => (v === null ? '—' : `${v.toFixed(1)}%`);
-const unitOf = (r: { type: PersonType; departmentName?: string | null; activityName?: string | null }) =>
-  r.type === 'SPORTS_COACH' ? (r.activityName ?? '—') : (r.departmentName ?? '—');
+const unitOf = (r: { activityName?: string | null }) => r.activityName ?? '—';
 
 async function describeFilters(q: ReportQuery) {
   const out: { label: string; value: string }[] = [];
   if (q.type) out.push({ label: 'Person type', value: PERSON_TYPE_LABELS[q.type] });
-  if (q.departmentId) {
-    const d = await one('SELECT name FROM departments WHERE id = $1', [q.departmentId]);
-    out.push({ label: 'Department', value: d?.name ?? 'Unknown' });
-  }
   if (q.activityId) {
     const a = await one('SELECT name FROM activities WHERE id = $1', [q.activityId]);
     out.push({ label: 'Sport / Activity', value: a?.name ?? 'Unknown' });
@@ -108,7 +101,7 @@ function resolveRange(q: ReportQuery, tz: string, capToToday = true) {
   return { from, to };
 }
 
-const filtersOf = (q: ReportQuery): Filters => ({ type: q.type, departmentId: q.departmentId, activityId: q.activityId, personId: q.personId, q: q.q });
+const filtersOf = (q: ReportQuery): Filters => ({ type: q.type, activityId: q.activityId, personId: q.personId, q: q.q });
 
 export async function buildReport(req: Request, type: ReportType, q: ReportQuery): Promise<Report> {
   const { rules, system } = await loadSettings();
@@ -141,7 +134,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
           { key: 'refId', label: 'Ref. ID', width: 70 },
           { key: 'name', label: 'Name', width: 130 },
           { key: 'type', label: 'Type', width: 80 },
-          { key: 'unit', label: 'Department / Sport', width: 130 },
+          { key: 'unit', label: 'Sport / Activity', width: 130 },
           { key: 'status', label: 'Status', width: 80 },
           { key: 'in', label: 'In-Time', align: 'center', width: 60 },
           { key: 'out', label: 'Out-Time', align: 'center', width: 60 },
@@ -184,7 +177,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
           { key: 'refId', label: 'Ref. ID', width: 70 },
           { key: 'name', label: 'Name', width: 130 },
           { key: 'type', label: 'Type', width: 80 },
-          { key: 'unit', label: 'Department / Sport', width: 130 },
+          { key: 'unit', label: 'Sport / Activity', width: 130 },
           { key: 'working', label: 'Working Days', align: 'right', width: 55 },
           { key: 'present', label: 'Present', align: 'right', width: 50 },
           { key: 'half', label: 'Half Days', align: 'right', width: 50 },
@@ -255,7 +248,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
         summary: [
           { label: 'Person', value: `${pm.person.fullName} (${pm.person.refId})` },
           { label: 'Type', value: PERSON_TYPE_LABELS[pm.person.type] },
-          { label: 'Department / Sport', value: unitOf(pm.person) },
+          { label: 'Sport / Activity', value: unitOf(pm.person) },
           { label: 'Working days', value: String(pm.summary.eligibleDays) },
           { label: 'Present', value: String(pm.summary.present) },
           { label: 'Half days', value: String(pm.summary.halfDays) },
@@ -268,14 +261,12 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
       };
     }
 
-    case 'department':
     case 'activity': {
       const { year, month } = resolveMonth(q, tz);
-      const isDept = type === 'department';
-      const m = await monthlySummary(req, year, month, { ...filtersOf(q), type: isDept ? 'GUEST_FACULTY' : 'SPORTS_COACH' });
+      const m = await monthlySummary(req, year, month, filtersOf(q));
       const groups = new Map<string, typeof m.rows>();
       for (const r of m.rows) {
-        const key = (isDept ? r.person.departmentName : r.person.activityName) ?? 'Unassigned';
+        const key = r.person.activityName ?? 'Unassigned';
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(r);
       }
@@ -301,7 +292,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
         ...base,
         period: DateTime.fromObject({ year, month }).toFormat('MMMM yyyy'),
         columns: [
-          { key: 'unit', label: isDept ? 'Department' : 'Sport / Activity', width: 170 },
+          { key: 'unit', label: 'Sport / Activity', width: 170 },
           { key: 'people', label: 'Personnel', align: 'right', width: 60 },
           { key: 'working', label: 'Person-days', align: 'right', width: 65 },
           { key: 'present', label: 'Present', align: 'right', width: 55 },
@@ -314,7 +305,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
         ],
         rows,
         summary: [
-          { label: isDept ? 'Departments' : 'Sports / activities', value: String(rows.length) },
+          { label: 'Sports / activities', value: String(rows.length) },
           { label: 'Personnel', value: String(m.rows.length) },
         ],
         notes: describeFormula(rules),
@@ -349,7 +340,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
             refId: p.ref_id,
             name: p.full_name,
             type: PERSON_TYPE_LABELS[p.type],
-            unit: p.type === 'SPORTS_COACH' ? (p.activity_name ?? '—') : (p.department_name ?? '—'),
+            unit: p.activity_name ?? '—',
           };
           if (type === 'absence') {
             const ev = evaluateDay(d, tr, rules);
@@ -370,7 +361,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
         { key: 'refId', label: 'Ref. ID', width: 70 },
         { key: 'name', label: 'Name', width: 130 },
         { key: 'type', label: 'Type', width: 80 },
-        { key: 'unit', label: 'Department / Sport', width: 130 },
+        { key: 'unit', label: 'Sport / Activity', width: 130 },
       ];
       const extra: Record<string, ReportColumn[]> = {
         absence: [
@@ -419,7 +410,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
     case 'leave': {
       const { from, to } = resolveRange(q, tz, false);
       const status = q.status && ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].includes(q.status) ? q.status : undefined;
-      const rows = await listLeaves(req, { from, to, status, personId: q.personId, type: q.type, departmentId: q.departmentId, activityId: q.activityId, q: q.q });
+      const rows = await listLeaves(req, { from, to, status, personId: q.personId, type: q.type, activityId: q.activityId, q: q.q });
       return {
         ...base,
         filters: base.filters.map((f) => (f.label === 'Status' && status ? { label: 'Status', value: status } : f)),
@@ -427,7 +418,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
         columns: [
           { key: 'refId', label: 'Ref. ID', width: 65 },
           { key: 'name', label: 'Name', width: 120 },
-          { key: 'unit', label: 'Department / Sport', width: 110 },
+          { key: 'unit', label: 'Sport / Activity', width: 110 },
           { key: 'leaveType', label: 'Type', width: 55 },
           { key: 'from', label: 'From', width: 70 },
           { key: 'to', label: 'To', width: 70 },
@@ -439,7 +430,7 @@ export async function buildReport(req: Request, type: ReportType, q: ReportQuery
         rows: rows.map((l: any) => ({
           refId: l.refId,
           name: l.personName,
-          unit: l.personType === 'SPORTS_COACH' ? (l.activityName ?? '—') : (l.departmentName ?? '—'),
+          unit: l.activityName ?? '—',
           leaveType: LEAVE_TYPE_LABELS[l.leaveType as LeaveType],
           from: formatDateLocal(l.fromDate, fmt),
           to: formatDateLocal(l.toDate, fmt),

@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { pool } from '../src/db/pool';
-import { ADMIN, app, COORD_CSE, login, OFFICER, PRESENT_GF, PW, reseed } from './helpers';
+import { ADMIN, app, COORD_FIELD, login, OFFICER, PRESENT_GF, PW, reseed } from './helpers';
 
 beforeAll(async () => {
   await reseed();
@@ -117,17 +117,17 @@ describe('role-based access control', () => {
     expect((await s.get('/api/dashboard')).status).toBe(200);
   });
 
-  it('limits coordinators to their assigned departments', async () => {
-    const s = await login(COORD_CSE);
+  it('limits coordinators to their assigned sports / activities', async () => {
+    const s = await login(COORD_FIELD);
     const people = await s.get('/api/people?pageSize=200');
     expect(people.status).toBe(200);
-    const units = new Set(people.body.rows.map((p: any) => p.departmentCode));
-    expect([...units].sort()).toEqual(['CSE', 'IT']);
-    const other = await pool.query(`SELECT p.id FROM people p JOIN departments d ON d.id = p.department_id WHERE d.code = 'ME' LIMIT 1`);
+    const units = new Set(people.body.rows.map((p: any) => p.activityName));
+    expect([...units].sort()).toEqual(['Athletics', 'Football']);
+    const other = await pool.query(`SELECT p.id FROM people p JOIN activities a ON a.id = p.activity_id WHERE a.name = 'Cricket' LIMIT 1`);
     expect((await s.get(`/api/people/${other.rows[0].id}`)).status).toBe(403);
     expect((await s.get(`/api/attendance/person/${other.rows[0].id}`)).status).toBe(403);
     const daily = await s.get('/api/attendance/today');
-    expect(daily.body.rows.every((r: any) => ['CSE', 'IT'].includes(r.person.departmentCode))).toBe(true);
+    expect(daily.body.rows.every((r: any) => ['Athletics', 'Football'].includes(r.person.activityName))).toBe(true);
     // Coordinators cannot mark attendance manually
     expect((await s.post('/api/attendance/manual', {})).status).toBe(403);
   });

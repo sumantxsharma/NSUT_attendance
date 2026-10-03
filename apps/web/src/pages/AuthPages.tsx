@@ -102,7 +102,7 @@ export function LoginPage() {
           {[
             ['superadmin@demo.invalid', 'Super Admin'],
             ['officer@demo.invalid', 'Authorized Officer'],
-            ['coordinator.cse@demo.invalid', 'Coordinator (CSE, IT)'],
+            ['coordinator.field@demo.invalid', 'Coordinator (Athletics, Football)'],
             ['coordinator.sports@demo.invalid', 'Coordinator (Sports)'],
             ['gf01.kavya@demo.invalid', 'Guest Faculty'],
             ['coach01.rajesh@demo.invalid', 'Sports Coach'],

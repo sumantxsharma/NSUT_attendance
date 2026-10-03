@@ -37,7 +37,6 @@ export const personSchema = z
     refId: trimmed(40).min(2, 'Reference ID is required').regex(/^[A-Za-z0-9/-]+$/, 'Letters, numbers, - and / only'),
     fullName: trimmed(120).min(2, 'Full name is required'),
     type: z.enum(PERSON_TYPES),
-    departmentId: uuid.optional().nullable(),
     activityId: uuid.optional().nullable(),
     designation: optionalText(120),
     specialization: optionalText(200),
@@ -58,12 +57,8 @@ export const personSchema = z
     message: 'Contract end must be on or after contract start',
     path: ['contractEnd'],
   })
-  .refine((p) => (p.type === 'GUEST_FACULTY' ? !!p.departmentId : true), {
-    message: 'Guest Faculty must belong to a department',
-    path: ['departmentId'],
-  })
-  .refine((p) => (p.type === 'SPORTS_COACH' ? !!p.activityId : true), {
-    message: 'Sports Coaches must be assigned a sport/activity',
+  .refine((p) => !!p.activityId, {
+    message: 'Choose a sport / activity',
     path: ['activityId'],
   });
 
@@ -74,16 +69,9 @@ export const createPersonSchema = personSchema.and(
   }),
 );
 
-export const departmentSchema = z.object({
-  name: trimmed(120).min(2),
-  code: trimmed(20).min(1).regex(/^[A-Z0-9&-]+$/, 'Uppercase letters, numbers, & and - only'),
-  status: z.enum(RECORD_STATUSES).optional(),
-});
-
 export const activitySchema = z.object({
   name: trimmed(120).min(2),
   category: trimmed(60).min(2),
-  departmentId: uuid.optional().nullable(),
   status: z.enum(RECORD_STATUSES).optional(),
 });
 
@@ -146,7 +134,6 @@ export const createUserSchema = z.object({
   role: z.enum(ROLES),
   password: passwordPolicy,
   personId: uuid.optional().nullable(),
-  scopeDepartmentIds: z.array(uuid).optional().default([]),
   scopeActivityIds: z.array(uuid).optional().default([]),
 });
 
@@ -161,7 +148,6 @@ export const updateUserSchema = z.object({
     .or(z.literal('').transform(() => null)),
   role: z.enum(ROLES).optional(),
   personId: uuid.optional().nullable(),
-  scopeDepartmentIds: z.array(uuid).optional(),
   scopeActivityIds: z.array(uuid).optional(),
 });
 
@@ -175,7 +161,6 @@ export const monthQuery = z.object({
 export const listFilterSchema = z.object({
   q: z.string().trim().max(100).optional(),
   type: z.enum(PERSON_TYPES).optional(),
-  departmentId: uuid.optional(),
   activityId: uuid.optional(),
   personId: uuid.optional(),
   status: z.enum(ATTENDANCE_STATUSES).optional(),

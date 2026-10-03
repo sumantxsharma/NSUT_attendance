@@ -63,7 +63,7 @@ Each file re-seeds the demo data, then drives the real Express app over HTTP aga
 - **RBAC:**
   - staff blocked from 6 admin endpoints
   - officer blocked from audit, rules and users
-  - **coordinator sees only CSE/IT** and gets 403 on other departments' people and calendars
+  - **coordinator sees only Athletics/Football** and gets 403 on other sports' people and calendars
   - staff see only their own profile
 - **Attendance** (`attendance.test.ts`):
   - **dashboard numbers equal the seeded scenario and change when data changes** (nothing hard-coded)
@@ -86,8 +86,8 @@ Each file re-seeds the demo data, then drives the real Express app over HTTP aga
   - staff cannot approve; out-of-scope coordinator cannot see the request; rejection requires remarks
   - **approval creates LEAVE attendance for working days, the person is notified, cancellation reverts attendance, audit trail**
   - approved leave does not overwrite a day the person attended
-  - people: create with login, duplicate ref ID 409, department required for Guest Faculty, edit, **deactivate disables login and hides from active lists**, audit trail
-  - officers view-only; search by ref ID, sport and department; `%` treated literally
+  - people: create with login, duplicate ref ID 409, sport / activity required, edit, **deactivate disables login and hides from active lists**, audit trail
+  - officers view-only; search by ref ID and sport; `%` treated literally
   - **all 10 report types**
   - **CSV (with formula-injection guard), XLSX (zip signature), PDF (`%PDF-`)**, exports audited
   - coordinator reports scoped

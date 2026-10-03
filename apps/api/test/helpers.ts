@@ -32,7 +32,7 @@ export async function login(email: string, password = PW) {
 
 export const ADMIN = 'superadmin@demo.invalid';
 export const OFFICER = 'officer@demo.invalid';
-export const COORD_CSE = 'coordinator.cse@demo.invalid';
+export const COORD_FIELD = 'coordinator.field@demo.invalid';
 export const COORD_SPORTS = 'coordinator.sports@demo.invalid';
 // Seed scenario for "today": index 11 (Ananya, HSS) and coach index 3 (Deepak) are NOT MARKED,
 // index 6 (Sanjay) is on approved leave, index 5 (Farhan) is marked ABSENT.

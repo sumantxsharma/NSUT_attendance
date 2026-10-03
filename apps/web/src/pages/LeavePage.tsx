@@ -38,8 +38,8 @@ export function LeavePage() {
   const qc = useQueryClient();
   const toast = useToast();
   const reviewer = can('leave.review');
-  const [f, setF] = useUrlState<{ status?: string; q?: string; type?: string; departmentId?: string; activityId?: string }>({});
-  const q = useQuery({ queryKey: ['leave', f], queryFn: () => api.get<Leave[]>('/leave', { status: f.status, q: f.q, type: f.type, departmentId: f.departmentId, activityId: f.activityId }) });
+  const [f, setF] = useUrlState<{ status?: string; q?: string; type?: string; activityId?: string }>({});
+  const q = useQuery({ queryKey: ['leave', f], queryFn: () => api.get<Leave[]>('/leave', { status: f.status, q: f.q, type: f.type, activityId: f.activityId }) });
   const [applyOpen, setApplyOpen] = useState(false);
   const [review, setReview] = useState<{ leave: Leave; mode: 'approve' | 'reject' | 'cancel' | 'view' } | null>(null);
   const [remarks, setRemarks] = useState('');
@@ -95,7 +95,7 @@ export function LeavePage() {
       <PanelBox>
         {reviewer && (
           <div className="border-b border-line px-4 py-3">
-            <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...(v as any), status: f.status }, true)} show={['q', 'type', 'department', 'activity']} />
+            <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...(v as any), status: f.status }, true)} show={['q', 'type', 'activity']} />
           </div>
         )}
         {q.isLoading ? (
@@ -127,7 +127,7 @@ export function LeavePage() {
                           <Link to={`/people/${l.personId}`} className="font-medium text-ink">
                             {l.personName}
                           </Link>
-                          <p className="text-xs text-muted">{unitName({ type: l.personType, departmentName: l.departmentName, activityName: l.activityName })}</p>
+                          <p className="text-xs text-muted">{unitName(l)}</p>
                         </div>
                       ),
                     },

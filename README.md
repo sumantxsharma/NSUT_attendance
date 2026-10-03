@@ -33,6 +33,10 @@ Open **http://localhost:5173** and sign in with a demo account (listed on the si
 
 The `.env` file in the repository root is loaded automatically. Variables already set in your shell take precedence.
 
+### On Vercel
+
+See [Deployment → Option C](docs/DEPLOYMENT.md#option-c-vercel--managed-postgresql). In short: import the repo, set `DATABASE_URL` (managed Postgres) and `SESSION_SECRET`, deploy.
+
 ### With Docker
 
 ```bash
@@ -51,7 +55,7 @@ All demo accounts use the password **`Demo@12345`**.
 |---|---|---|
 | Super Admin | `superadmin@demo.invalid` | Everything, including configuration and audit logs |
 | Authorized Officer | `officer@demo.invalid` | All personnel; can mark and correct attendance, review leave, export reports |
-| Coordinator (CSE, IT) | `coordinator.cse@demo.invalid` | Only CSE and IT Guest Faculty |
+| Coordinator (Athletics, Football) | `coordinator.field@demo.invalid` | Only Athletics and Football faculty and coaches |
 | Coordinator (Sports) | `coordinator.sports@demo.invalid` | Only Sports Coaches |
 | Guest Faculty | `gf01.kavya@demo.invalid` (… `gf15.*`) | Own attendance and leave |
 | Sports Coach | `coach01.rajesh@demo.invalid` (… `coach10.*`) | Own attendance and leave |

@@ -3,114 +3,86 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import clsx from 'clsx';
-import {
-  Activity,
-  BarChart3,
-  Bell,
-  Building2,
-  CalendarDays,
-  CalendarRange,
-  ClipboardCheck,
-  ClipboardList,
-  FileText,
-  GraduationCap,
-  History,
-  LayoutDashboard,
-  ListChecks,
-  LogOut,
-  Menu,
-  Radio,
-  Search,
-  Settings2,
-  ShieldCheck,
-  SlidersHorizontal,
-  Trophy,
-  User,
-  UserCog,
-  Users,
-  X,
-} from 'lucide-react';
+import { Bell, CalendarOff, ClipboardCheck, FileText, LayoutDashboard, ListChecks, LogOut, Menu, Search, Settings2, User, Users } from 'lucide-react';
 import { APP_NAME, APP_SUBTITLE, ROLE_LABELS, type Permission } from '@nsut/shared';
 import { api } from '../lib/api';
 import { useAuth, usePublicSettings } from '../lib/auth';
 import { relativeTime, unitName } from '../lib/format';
 import type { Person } from '../lib/types';
 
-interface NavItem {
+interface Tab {
   to: string;
   label: string;
-  icon: typeof LayoutDashboard;
   perm?: Permission;
-  end?: boolean;
 }
-interface NavGroup {
-  label?: string;
-  items: NavItem[];
+interface Section {
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** Where the sidebar link goes: the first tab the user may open, or `to` when there are no tabs. */
+  to?: string;
+  perm?: Permission | Permission[];
+  /** Path prefixes that belong to this section. */
+  match: string[];
+  tabs?: Tab[];
 }
 
-const NAV: NavGroup[] = [
-  {
-    items: [
-      { to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: 'dashboard.view', end: true },
-      { to: '/me', label: 'My Attendance', icon: ClipboardCheck, perm: 'attendance.self' },
-    ],
-  },
+// Top-level sections stay short; sub-pages are tabs shown at the top of the section.
+const SECTIONS: Section[] = [
+  { label: 'Dashboard', icon: LayoutDashboard, to: '/', perm: 'dashboard.view', match: [] },
+  { label: 'My Attendance', icon: ClipboardCheck, to: '/me', perm: 'attendance.self', match: ['/me'] },
   {
     label: 'Attendance',
-    items: [
-      { to: '/attendance/today', label: "Today's Attendance", icon: ListChecks, perm: 'attendance.read' },
-      { to: '/attendance/live', label: 'Live Presence', icon: Radio, perm: 'attendance.read' },
-      { to: '/attendance/calendar', label: 'Calendar', icon: CalendarDays, perm: 'attendance.read' },
-      { to: '/attendance/monthly', label: 'Monthly Records', icon: CalendarRange, perm: 'attendance.read' },
-      { to: '/attendance/corrections', label: 'Corrections', icon: History, perm: 'attendance.read' },
+    icon: ListChecks,
+    match: ['/attendance'],
+    tabs: [
+      { to: '/attendance/today', label: 'Today', perm: 'attendance.read' },
+      { to: '/attendance/live', label: 'Live presence', perm: 'attendance.read' },
+      { to: '/attendance/calendar', label: 'Calendar', perm: 'attendance.read' },
+      { to: '/attendance/monthly', label: 'Monthly', perm: 'attendance.read' },
+      { to: '/attendance/corrections', label: 'Corrections', perm: 'attendance.read' },
     ],
   },
   {
     label: 'People',
-    items: [
-      { to: '/people/faculty', label: 'Guest Faculty', icon: GraduationCap, perm: 'people.read' },
-      { to: '/people/coaches', label: 'Sports Coaches', icon: Trophy, perm: 'people.read' },
-      { to: '/departments', label: 'Departments', icon: Building2, perm: 'people.read' },
-      { to: '/activities', label: 'Sports & Activities', icon: Activity, perm: 'people.read' },
+    icon: Users,
+    match: ['/people', '/activities'],
+    tabs: [
+      { to: '/people/faculty', label: 'Guest Faculty', perm: 'people.read' },
+      { to: '/people/coaches', label: 'Sports Coaches', perm: 'people.read' },
+      { to: '/activities', label: 'Sports & Activities', perm: 'people.read' },
     ],
   },
-  {
-    label: 'Leave',
-    items: [
-      { to: '/leave?status=PENDING', label: 'Requests', icon: ClipboardList, perm: 'leave.review' },
-      { to: '/leave?status=APPROVED', label: 'Approved', icon: ClipboardCheck, perm: 'leave.review' },
-      { to: '/leave?status=REJECTED', label: 'Rejected', icon: X, perm: 'leave.review' },
-      { to: '/leave', label: 'My Leave', icon: ClipboardList, perm: 'leave.self' },
-    ],
-  },
-  {
-    label: 'Reports',
-    items: [
-      { to: '/reports/daily', label: 'Daily', icon: FileText, perm: 'reports.generate' },
-      { to: '/reports/monthly', label: 'Monthly', icon: FileText, perm: 'reports.generate' },
-      { to: '/reports/individual', label: 'Individual', icon: FileText, perm: 'reports.generate' },
-      { to: '/reports/department', label: 'Department', icon: FileText, perm: 'reports.generate' },
-      { to: '/reports/absence', label: 'Absence', icon: FileText, perm: 'reports.generate' },
-      { to: '/reports/leave', label: 'Leave', icon: FileText, perm: 'reports.generate' },
-      { to: '/reports', label: 'All reports', icon: BarChart3, perm: 'reports.generate', end: true },
-    ],
-  },
+  { label: 'Leave', icon: CalendarOff, to: '/leave', perm: ['leave.self', 'leave.review'], match: ['/leave'] },
+  { label: 'Reports', icon: FileText, to: '/reports', perm: 'reports.generate', match: ['/reports'] },
   {
     label: 'Administration',
-    items: [
-      { to: '/admin/users', label: 'Users', icon: UserCog, perm: 'users.manage' },
-      { to: '/admin/roles', label: 'Roles', icon: ShieldCheck, perm: 'users.manage' },
-      { to: '/admin/rules', label: 'Attendance Rules', icon: SlidersHorizontal, perm: 'rules.manage' },
-      { to: '/admin/settings', label: 'System Settings', icon: Settings2, perm: 'settings.manage' },
-    ],
-  },
-  {
-    items: [
-      { to: '/audit', label: 'Audit Logs', icon: History, perm: 'audit.read' },
-      { to: '/profile', label: 'Profile', icon: User },
+    icon: Settings2,
+    match: ['/admin', '/audit'],
+    tabs: [
+      { to: '/admin/users', label: 'Users', perm: 'users.manage' },
+      { to: '/admin/roles', label: 'Roles', perm: 'users.manage' },
+      { to: '/admin/rules', label: 'Attendance rules', perm: 'rules.manage' },
+      { to: '/admin/settings', label: 'Settings', perm: 'settings.manage' },
+      { to: '/audit', label: 'Audit log', perm: 'audit.read' },
     ],
   },
 ];
+
+const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(prefix + '/');
+
+function useSections() {
+  const { can } = useAuth();
+  const allowed = (perm?: Permission | Permission[]) => !perm || (Array.isArray(perm) ? perm.some((p) => can(p)) : can(perm));
+  return SECTIONS.flatMap((s) => {
+    const tabs = s.tabs?.filter((t) => allowed(t.perm));
+    if (tabs ? tabs.length === 0 : !allowed(s.perm)) return [];
+    return [{ ...s, tabs, to: tabs?.[0].to ?? s.to! }];
+  });
+}
+
+function sectionFor(sections: ReturnType<typeof useSections>, pathname: string) {
+  return sections.find((s) => (s.to === '/' ? pathname === '/' : s.match.some((m) => under(pathname, m))));
+}
 
 function LogoMark({ size = 36 }: { size?: number }) {
   const { data } = usePublicSettings();
@@ -118,7 +90,7 @@ function LogoMark({ size = 36 }: { size?: number }) {
     return <img src={`/api/settings/logo?v=${data.logoVersion}`} alt="University logo" className="shrink-0 rounded bg-white object-contain p-0.5" style={{ width: size, height: size }} />;
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded border border-dashed border-white/40 text-[8px] font-semibold uppercase tracking-wider text-white/60"
+      className="inline-flex shrink-0 items-center justify-center rounded border border-dashed border-[#C5CBD4] text-[8px] font-semibold uppercase tracking-wider text-muted"
       style={{ width: size, height: size }}
       title="Placeholder — upload the official logo in System Settings"
       aria-label="Logo placeholder"
@@ -129,56 +101,71 @@ function LogoMark({ size = 36 }: { size?: number }) {
 }
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { can } = useAuth();
+  const sections = useSections();
   const loc = useLocation();
-  const isActive = (item: NavItem) => {
-    const [path, query] = item.to.split('?');
-    if (query) return loc.pathname === path && loc.search === `?${query}`;
-    if (item.to === '/leave') return loc.pathname === '/leave' && !loc.search.includes('status=');
-    return item.end ? loc.pathname === path : loc.pathname === path || loc.pathname.startsWith(path + '/');
-  };
+  const current = sectionFor(sections, loc.pathname);
   return (
-    <nav aria-label="Main" className="flex h-full flex-col bg-ink-800 text-[#D8DEE8]">
-      <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
-        <LogoMark />
+    <nav aria-label="Main" className="flex h-full flex-col border-r border-line bg-white">
+      <div className="flex h-14 items-center gap-2.5 px-4">
+        <LogoMark size={28} />
         <div className="min-w-0 leading-tight">
-          <p className="truncate text-[13px] font-semibold text-white">{APP_NAME}</p>
-          <p className="truncate text-2xs text-[#9FB0C8]">{APP_SUBTITLE}</p>
+          <p className="truncate text-[13px] font-semibold text-ink" title={APP_NAME}>NSUT Attendance</p>
+          <p className="truncate text-2xs text-muted" title={APP_SUBTITLE}>Guest Faculty & Coaches</p>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 py-3">
-        {NAV.map((g, gi) => {
-          const items = g.items.filter((i) => !i.perm || can(i.perm));
-          if (!items.length) return null;
+      <ul className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
+        {sections.map((s) => {
+          const active = s === current;
           return (
-            <div key={gi} className="mb-3">
-              {g.label && <p className="px-2.5 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-wider text-[#7F91AD]">{g.label}</p>}
-              <ul>
-                {items.map((i) => {
-                  const active = isActive(i);
-                  return (
-                    <li key={i.to}>
-                      <NavLink
-                        to={i.to}
-                        onClick={onNavigate}
-                        aria-current={active ? 'page' : undefined}
-                        className={clsx(
-                          'flex items-center gap-2.5 rounded px-2.5 py-[7px] text-[13.5px] no-underline transition-colors',
-                          active ? 'bg-white/[0.12] font-medium text-white' : 'text-[#C9D2E0] hover:bg-white/[0.06] hover:text-white',
-                        )}
-                      >
-                        <i.icon className={clsx('h-4 w-4 shrink-0', active ? 'text-white' : 'text-[#8FA1BD]')} aria-hidden />
-                        {i.label}
-                      </NavLink>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+            <li key={s.label}>
+              <NavLink
+                to={s.to}
+                onClick={onNavigate}
+                aria-current={active ? 'page' : undefined}
+                className={clsx(
+                  'flex items-center gap-3 rounded px-2.5 py-2 text-sm no-underline transition-colors',
+                  active ? 'bg-[#F0F2F5] font-medium text-ink' : 'text-[#475467] hover:bg-[#F6F7F9] hover:text-ink',
+                )}
+              >
+                <s.icon className={clsx('h-[18px] w-[18px] shrink-0', active ? 'text-brand-600' : 'text-[#98A2B3]')} aria-hidden />
+                {s.label}
+              </NavLink>
+            </li>
           );
         })}
-      </div>
-      <p className="border-t border-white/10 px-4 py-2.5 text-[10.5px] text-[#7F91AD]">Built in-house at NSUT · R1</p>
+      </ul>
+      <p className="px-4 py-3 text-[11px] text-muted">Built in-house at NSUT</p>
+    </nav>
+  );
+}
+
+/** Tab strip for the current section's sub-pages. */
+function SectionTabs() {
+  const sections = useSections();
+  const loc = useLocation();
+  const tabs = sectionFor(sections, loc.pathname)?.tabs;
+  if (!tabs || tabs.length < 2) return null;
+  return (
+    <nav aria-label="Section" className="-mx-3 mb-5 overflow-x-auto border-b border-line px-3 sm:-mx-6 sm:px-6" data-noprint>
+      <ul className="flex gap-5">
+        {tabs.map((t) => {
+          const active = under(loc.pathname, t.to);
+          return (
+            <li key={t.to}>
+              <Link
+                to={t.to}
+                aria-current={active ? 'page' : undefined}
+                className={clsx(
+                  '-mb-px block whitespace-nowrap border-b-2 py-2.5 text-sm no-underline',
+                  active ? 'border-brand-600 font-medium text-ink' : 'border-transparent text-muted hover:text-ink',
+                )}
+              >
+                {t.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }
@@ -196,7 +183,7 @@ function GlobalSearch() {
   }, [q]);
   const { data, isFetching } = useQuery({
     queryKey: ['search', debounced],
-    queryFn: () => api.get<(Pick<Person, 'id' | 'fullName' | 'refId' | 'type' | 'status' | 'departmentName' | 'activityName'>)[]>('/search', { q: debounced }),
+    queryFn: () => api.get<(Pick<Person, 'id' | 'fullName' | 'refId' | 'type' | 'status' | 'activityName'>)[]>('/search', { q: debounced }),
     enabled: debounced.length >= 2,
   });
   useEffect(() => {
@@ -225,7 +212,7 @@ function GlobalSearch() {
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
       <input
         className="input pl-9 pr-9"
-        placeholder="Search name, ref. ID, department, sport…"
+        placeholder="Search name, ref. ID or sport…"
         value={q}
         role="combobox"
         aria-expanded={open && results.length > 0}
@@ -383,11 +370,11 @@ export function AppLayout() {
   const loc = useLocation();
   useEffect(() => setDrawer(false), [loc.pathname, loc.search]);
   return (
-    <div className="min-h-screen lg:pl-[248px] print:!pl-0">
+    <div className="min-h-screen lg:pl-[232px] print:!pl-0">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2">
         Skip to content
       </a>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] lg:block" data-noprint>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] lg:block" data-noprint>
         <Sidebar />
       </aside>
       {drawer && (
@@ -407,6 +394,7 @@ export function AppLayout() {
         <UserMenu />
       </header>
       <main id="main" className="mx-auto max-w-[1400px] px-3 py-5 sm:px-6 sm:py-6">
+        <SectionTabs />
         <Outlet />
       </main>
     </div>

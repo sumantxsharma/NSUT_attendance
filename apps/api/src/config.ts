@@ -57,7 +57,6 @@ export const config = {
   sessionIdleMinutes: Number(process.env.SESSION_IDLE_MINUTES ?? 60),
   cookieSecure: (process.env.COOKIE_SECURE ?? (isProd ? 'true' : 'false')) === 'true',
   trustProxy: process.env.TRUST_PROXY ?? (isProd ? '1' : 'false'),
-  uploadDir: process.env.UPLOAD_DIR ?? path.join(ROOT_DIR, 'uploads'),
   webDistDir: process.env.WEB_DIST_DIR ?? path.join(ROOT_DIR, 'apps', 'web', 'dist'),
   migrationsDir: process.env.MIGRATIONS_DIR ?? path.join(ROOT_DIR, 'database', 'migrations'),
   appBaseUrl: process.env.APP_BASE_URL ?? 'http://localhost:5173',

@@ -33,7 +33,7 @@ Roles and scopes stay managed in this application.
 
 - **Permissions, not roles, are checked on every route** (`requirePerm`). The role → permission matrix lives in one file (`packages/shared/src/permissions.ts`) and is shown read-only under *Administration → Roles*.
 - **Row-level scope:**
-  - Coordinators see only people in their assigned departments or activities (`peopleScopeSql`, `assertPersonVisible`). This is enforced on lists, profiles, calendars, leave, reports, dashboard and search.
+  - Coordinators see only people in their assigned sports / activities (`peopleScopeSql`, `assertPersonVisible`). This is enforced on lists, profiles, calendars, leave, reports, dashboard and search.
   - Staff can access only their own profile and records.
 - **Segregation of duties:**
   - reviewers cannot approve their own leave or their own correction requests
@@ -57,7 +57,7 @@ Roles and scopes stay managed in this application.
 ## File uploads
 
 - Files are held in memory, then **validated by magic bytes** (PNG, JPEG, PDF). The client-declared type and extension are ignored.
-- Files are stored under `UPLOAD_DIR` with random UUID names and are **never served from a public static path**. They are streamed through authorised endpoints with `nosniff`. Path traversal is blocked.
+- Files are stored in the `stored_files` table under random UUID keys and are **never served from a public static path**. They are sent through authorised endpoints with `nosniff`.
 - The sanitised original filename is stored only for display.
 
 ## Audit logging
@@ -70,7 +70,7 @@ Roles and scopes stay managed in this application.
 - leave submit, approve, reject, cancel
 - person create, update, deactivate, activate
 - user create, update, deactivate, activate, reset link issued
-- department and activity changes
+- sport / activity changes
 - rules, system settings, logo and holiday changes
 - report exports
 
@@ -78,7 +78,7 @@ Each entry stores the actor, timestamp, action, record, before and after JSON sn
 
 ## Privacy
 
-- Only data needed for attendance is collected: name, reference ID, role and department data, contact details, contract dates, attendance times, leave details and an optional photograph.
+- Only data needed for attendance is collected: name, reference ID, role and sport / activity, contact details, contract dates, attendance times, leave details and an optional photograph.
 - **No GPS location, device fingerprinting or biometrics are collected.** These would need separate institutional approval (see *Future-ready architecture* in ARCHITECTURE.md).
 - **IP address and browser user agent** are recorded on self check-ins and audit entries so disputed entries can be investigated. Set `RECORD_CLIENT_META=false` to disable this. This should be disclosed to staff in the institution's privacy notice.
 - Staff see only their own data. Contact details are visible only to officers, coordinators (in scope) and admins.

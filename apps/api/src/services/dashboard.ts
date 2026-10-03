@@ -56,12 +56,9 @@ export async function dashboard(req: Request, filters: Filters = {}) {
     return { date: d, overall: r1(a.credits, a.eligible), guestFaculty: r1(a.gfC, a.gfE), sportsCoaches: r1(a.scC, a.scE), eligible: a.eligible };
   });
 
-  // --- Department / activity summary (today + month-to-date)
-  const unitMap = new Map<string, { key: string; name: string; kind: 'department' | 'activity'; people: number; presentToday: number; absentToday: number; leaveToday: number; notMarkedToday: number; eligible: number; credits: number }>();
-  const unitOf = (row: { person: { type: string; departmentName: string | null; activityName: string | null; departmentId: string | null; activityId: string | null } }) =>
-    row.person.type === 'SPORTS_COACH'
-      ? { key: `a:${row.person.activityId}`, name: row.person.activityName ?? 'Unassigned', kind: 'activity' as const }
-      : { key: `d:${row.person.departmentId}`, name: row.person.departmentName ?? 'Unassigned', kind: 'department' as const };
+  // --- Sport / activity summary (today + month-to-date)
+  const unitMap = new Map<string, { key: string; name: string; people: number; presentToday: number; absentToday: number; leaveToday: number; notMarkedToday: number; eligible: number; credits: number }>();
+  const unitOf = (row: { person: { activityName: string | null; activityId: string | null } }) => ({ key: row.person.activityId ?? 'none', name: row.person.activityName ?? 'Unassigned' });
   for (const row of sheet.rows) {
     const u = unitOf(row);
     if (!unitMap.has(u.key)) unitMap.set(u.key, { ...u, people: 0, presentToday: 0, absentToday: 0, leaveToday: 0, notMarkedToday: 0, eligible: 0, credits: 0 });
@@ -81,35 +78,7 @@ export async function dashboard(req: Request, filters: Filters = {}) {
   }
   const units = [...unitMap.values()]
     .map((u) => ({ ...u, monthPercentage: r1(u.credits, u.eligible) }))
-    .sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
-
-  // --- Recent activity (scoped): check-ins/outs, leave decisions, corrections
-  const p = new Params();
-  const scope = peopleScopeSql(req, p);
-  const recent = await query(
-    `SELECT * FROM (
-       SELECT 'CHECK_IN' AS kind, at.check_in_at AS at, pp.id AS "personId", pp.full_name AS "personName", NULL::text AS detail, NULL::text AS actor
-         FROM attendance at JOIN people pp ON pp.id = at.person_id, LATERAL (SELECT pp.id, pp.department_id, pp.activity_id) p
-         WHERE at.check_in_at IS NOT NULL AND at.check_in_at > now() - interval '3 days' AND ${scope}
-       UNION ALL
-       SELECT 'CHECK_OUT', at.check_out_at, pp.id, pp.full_name, NULL, NULL
-         FROM attendance at JOIN people pp ON pp.id = at.person_id, LATERAL (SELECT pp.id, pp.department_id, pp.activity_id) p
-         WHERE at.check_out_at IS NOT NULL AND at.check_out_at > now() - interval '3 days' AND ${scope}
-       UNION ALL
-       SELECT 'LEAVE_' || l.status, l.reviewed_at, pp.id, pp.full_name, to_char(l.from_date,'DD Mon') || ' – ' || to_char(l.to_date,'DD Mon'), u.name
-         FROM leaves l JOIN people pp ON pp.id = l.person_id LEFT JOIN users u ON u.id = l.reviewed_by, LATERAL (SELECT pp.id, pp.department_id, pp.activity_id) p
-         WHERE l.reviewed_at IS NOT NULL AND l.status IN ('APPROVED','REJECTED') AND ${scope}
-       UNION ALL
-       SELECT 'LEAVE_SUBMITTED', l.submitted_at, pp.id, pp.full_name, to_char(l.from_date,'DD Mon') || ' – ' || to_char(l.to_date,'DD Mon'), NULL
-         FROM leaves l JOIN people pp ON pp.id = l.person_id, LATERAL (SELECT pp.id, pp.department_id, pp.activity_id) p
-         WHERE ${scope}
-       UNION ALL
-       SELECT 'CORRECTION', c.requested_at, pp.id, pp.full_name, to_char(c.date,'DD Mon YYYY') || ': ' || c.reason, u.name
-         FROM attendance_corrections c JOIN people pp ON pp.id = c.person_id LEFT JOIN users u ON u.id = c.requested_by, LATERAL (SELECT pp.id, pp.department_id, pp.activity_id) p
-         WHERE ${scope}
-     ) x WHERE at IS NOT NULL ORDER BY at DESC LIMIT 15`,
-    p.values,
-  );
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const lp = new Params();
   const pending = await query<{ n: number }>(
@@ -141,7 +110,6 @@ export async function dashboard(req: Request, filters: Filters = {}) {
     },
     trend,
     units,
-    recent,
     pendingLeave: pending[0]?.n ?? 0,
     contractsExpiring: expiring,
   };

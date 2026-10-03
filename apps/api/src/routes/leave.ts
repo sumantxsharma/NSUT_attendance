@@ -1,9 +1,8 @@
-import fs from 'node:fs';
 import { Router } from 'express';
 import { z } from 'zod';
 import { isoDate, LEAVE_STATUSES, leaveRejectSchema, leaveReviewSchema, leaveSchema, PERSON_TYPES, uuid } from '@nsut/shared';
-import { ah, forbidden, notFound } from '../lib/errors';
-import { MIME_BY_EXT, memoryUpload, resolveUpload, saveValidatedFile } from '../lib/upload';
+import { ah, forbidden } from '../lib/errors';
+import { deleteStoredFile, memoryUpload, saveValidatedFile, sendStoredFile } from '../lib/upload';
 import { requirePerm } from '../middleware/auth';
 import { can } from '@nsut/shared';
 import { cancelLeave, getLeave, leaveDocumentPath, listLeaves, reviewLeave, submitLeave } from '../services/leave';
@@ -17,12 +16,12 @@ leaveRouter.post(
   ah(async (req, res) => {
     // Multipart bodies arrive as strings.
     const b = leaveSchema.parse({ ...req.body, personId: req.body.personId || undefined });
-    const doc = saveValidatedFile(req.file, ['application/pdf', 'image/png', 'image/jpeg'], 'leave-docs');
+    const doc = await saveValidatedFile(req.file, ['application/pdf', 'image/png', 'image/jpeg'], 'leave-docs');
     try {
       const leave = await submitLeave(req, { ...b, document: doc });
       res.status(201).json(leave);
     } catch (e) {
-      if (doc) fs.rmSync(resolveUpload(doc.path), { force: true });
+      if (doc) await deleteStoredFile(doc.path);
       throw e;
     }
   }),
@@ -40,7 +39,6 @@ leaveRouter.get(
         to: isoDate.optional(),
         q: z.string().trim().max(100).optional(),
         type: z.enum(PERSON_TYPES).optional(),
-        departmentId: uuid.optional(),
         activityId: uuid.optional(),
       })
       .parse(req.query);
@@ -83,11 +81,6 @@ leaveRouter.get(
   requirePerm('leave.self', 'leave.review'),
   ah(async (req, res) => {
     const row = await leaveDocumentPath(req, uuid.parse(req.params.id));
-    const full = resolveUpload(row.document_path!);
-    if (!fs.existsSync(full)) throw notFound('Document');
-    res.setHeader('Content-Type', MIME_BY_EXT[full.split('.').pop()!] ?? 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${(row.document_name ?? 'document').replace(/"/g, '')}"`);
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    fs.createReadStream(full).pipe(res);
+    await sendStoredFile(res, row.document_path, 'Document', { 'Content-Disposition': `inline; filename="${(row.document_name ?? 'document').replace(/"/g, '')}"` });
   }),
 );

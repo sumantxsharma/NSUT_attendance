@@ -10,7 +10,8 @@ pg.types.setTypeParser(20, (v: string) => Number(v));
 
 export const pool = new pg.Pool({
   connectionString: config.databaseUrl,
-  max: Number(process.env.DB_POOL_MAX ?? 10),
+  // Serverless instances each hold their own pool: keep it small and point DATABASE_URL at a pooled endpoint.
+  max: Number(process.env.DB_POOL_MAX ?? (process.env.VERCEL ? 3 : 10)),
   idleTimeoutMillis: 30_000,
 });
 

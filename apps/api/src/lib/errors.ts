@@ -29,13 +29,10 @@ const CONSTRAINT_MESSAGES: Record<string, [number, string]> = {
   people_ref_uq: [409, 'A person with this Employee/Reference ID already exists.'],
   users_email_uq: [409, 'A user with this email already exists.'],
   users_person_uq: [409, 'This person already has a login account.'],
-  departments_code_uq: [409, 'A department with this code already exists.'],
-  departments_name_uq: [409, 'A department with this name already exists.'],
   activities_name_uq: [409, 'A sport/activity with this name already exists.'],
   holidays_date_key: [409, 'A holiday already exists on this date.'],
   attendance_corrections_one_pending: [409, 'A correction for this date is already awaiting approval.'],
-  people_gf_dept_ck: [400, 'Guest Faculty must belong to a department.'],
-  people_sc_activity_ck: [400, 'Sports Coaches must be assigned a sport/activity.'],
+  people_activity_ck: [400, 'Choose a sport / activity.'],
   users_staff_person_ck: [400, 'A staff login must be linked to a Guest Faculty / Coach profile.'],
 };
 

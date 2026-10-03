@@ -10,8 +10,8 @@ export default {
       colors: {
         ink: { DEFAULT: '#1B2A41', 900: '#111C2E', 800: '#15233A', 700: '#1B2A41', 600: '#2B3D59', 500: '#44587A' },
         brand: { DEFAULT: '#1F4E8C', 50: '#EEF3FA', 100: '#DCE6F4', 600: '#1F4E8C', 700: '#183F72', 800: '#12325B' },
-        canvas: '#F5F6F8',
-        line: '#DDE1E7',
+        canvas: '#F6F7F9',
+        line: '#E2E5EA',
         muted: '#5B6472',
         st: {
           present: '#1D7A46', presentBg: '#E8F4ED',
@@ -23,7 +23,7 @@ export default {
           holiday: '#3F5566', holidayBg: '#E9EEF2',
         },
       },
-      borderRadius: { DEFAULT: '4px', md: '6px' },
+      borderRadius: { DEFAULT: '6px', md: '8px' },
       fontSize: { '2xs': ['11px', '14px'] },
     },
   },

@@ -22,7 +22,7 @@ export interface LeaveInput {
 
 const LEAVE_SELECT = `
   l.id, l.person_id AS "personId", p.full_name AS "personName", p.ref_id AS "refId", p.type AS "personType",
-  d.name AS "departmentName", a.name AS "activityName",
+  a.name AS "activityName",
   l.from_date AS "fromDate", l.to_date AS "toDate", l.leave_type AS "leaveType", l.reason, l.status,
   (l.document_path IS NOT NULL) AS "hasDocument", l.document_name AS "documentName",
   l.submitted_at AS "submittedAt", su.name AS "submittedBy",
@@ -30,7 +30,7 @@ const LEAVE_SELECT = `
   (l.to_date - l.from_date + 1) AS "days"`;
 const LEAVE_JOINS = `
   JOIN people p ON p.id = l.person_id
-  LEFT JOIN departments d ON d.id = p.department_id LEFT JOIN activities a ON a.id = p.activity_id
+  LEFT JOIN activities a ON a.id = p.activity_id
   LEFT JOIN users su ON su.id = l.submitted_by LEFT JOIN users ru ON ru.id = l.reviewed_by`;
 
 export async function submitLeave(req: Request, input: LeaveInput) {
@@ -110,7 +110,7 @@ export async function getLeave(req: Request, id: string, client?: pg.PoolClient)
 
 export async function listLeaves(
   req: Request,
-  f: { status?: string; personId?: string; from?: string; to?: string; q?: string; type?: string; departmentId?: string; activityId?: string },
+  f: { status?: string; personId?: string; from?: string; to?: string; q?: string; type?: string; activityId?: string },
 ) {
   const p = new Params();
   const where = [peopleScopeSql(req, p)];
@@ -119,7 +119,6 @@ export async function listLeaves(
   if (f.from) where.push(`l.to_date >= ${p.add(f.from)}`);
   if (f.to) where.push(`l.from_date <= ${p.add(f.to)}`);
   if (f.type) where.push(`p.type = ${p.add(f.type)}`);
-  if (f.departmentId) where.push(`p.department_id = ${p.add(f.departmentId)}`);
   if (f.activityId) where.push(`p.activity_id = ${p.add(f.activityId)}`);
   if (f.q) {
     const q = p.add(likePattern(f.q));

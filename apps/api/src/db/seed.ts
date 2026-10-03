@@ -1,7 +1,7 @@
 /**
  * Demo seed — FICTIONAL data only.
  *
- * Creates departments, sports/activities, 16 Guest Faculty (1 inactive), 10 Sports Coaches,
+ * Creates sports/activities, 16 sports Guest Faculty (1 inactive), 10 Sports Coaches,
  * users for every role, holidays, leave requests, corrections, and attendance from the first
  * day of the month two months ago up to today. "Today" gets a realistic scenario
  * (present / on leave / absent / not marked) computed relative to the current time so no
@@ -42,43 +42,36 @@ const rnd = mulberry32(20260928);
 const between = (a: number, b: number) => Math.floor(a + rnd() * (b - a + 1));
 const hhmm = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 
-const DEPARTMENTS = [
-  ['Computer Science & Engineering', 'CSE'],
-  ['Electronics & Communication Engineering', 'ECE'],
-  ['Mechanical Engineering', 'ME'],
-  ['Information Technology', 'IT'],
-  ['Humanities & Social Sciences', 'HSS'],
-  ['Applied Mathematics', 'MATH'],
-  ['Sports Office', 'SPORTS'],
-] as const;
-
 const ACTIVITIES = [
   ['Athletics', 'Outdoor'],
   ['Football', 'Outdoor'],
   ['Cricket', 'Outdoor'],
   ['Basketball', 'Court'],
+  ['Volleyball', 'Court'],
   ['Badminton', 'Indoor'],
+  ['Table Tennis', 'Indoor'],
+  ['Swimming', 'Aquatics'],
   ['Yoga & Fitness', 'Fitness'],
 ] as const;
 
 // Obviously fictional demo identities (ref IDs start with DEMO-, emails use the reserved .invalid TLD).
 const GUEST_FACULTY: [string, string, string, string][] = [
-  ['Dr. Kavya Demo-Iyer', 'CSE', 'Guest Faculty', 'Machine Learning'],
-  ['Arjun Demo-Mehta', 'CSE', 'Guest Faculty', 'Data Structures'],
-  ['Dr. Ritu Demo-Saxena', 'CSE', 'Guest Faculty', 'Computer Networks'],
-  ['Nikhil Demo-Bansal', 'ECE', 'Guest Faculty', 'VLSI Design'],
-  ['Dr. Priya Demo-Nair', 'ECE', 'Guest Faculty', 'Signal Processing'],
-  ['Farhan Demo-Qureshi', 'ECE', 'Guest Faculty', 'Embedded Systems'],
-  ['Dr. Sanjay Demo-Rathore', 'ME', 'Guest Faculty', 'Thermodynamics'],
-  ['Meenal Demo-Kapoor', 'ME', 'Guest Faculty', 'Manufacturing Processes'],
-  ['Dr. Tanvir Demo-Singh', 'ME', 'Guest Faculty', 'Fluid Mechanics'],
-  ['Ishita Demo-Chawla', 'IT', 'Guest Faculty', 'Web Technologies'],
-  ['Dr. Rohan Demo-Pillai', 'IT', 'Guest Faculty', 'Database Systems'],
-  ['Ananya Demo-Ghosh', 'HSS', 'Guest Faculty', 'Technical Communication'],
-  ['Dr. Vikram Demo-Joshi', 'HSS', 'Guest Faculty', 'Engineering Economics'],
-  ['Dr. Sneha Demo-Kulkarni', 'MATH', 'Guest Faculty', 'Linear Algebra'],
-  ['Kabir Demo-Malhotra', 'MATH', 'Guest Faculty', 'Probability & Statistics'],
-  ['Dr. Leela Demo-Menon', 'CSE', 'Guest Faculty', 'Compiler Design'], // inactive (contract ended)
+  ['Dr. Kavya Demo-Iyer', 'Athletics', 'Guest Faculty (Physical Education)', 'Exercise Physiology'],
+  ['Arjun Demo-Mehta', 'Football', 'Guest Faculty (Physical Education)', 'Sports Training Methods'],
+  ['Dr. Ritu Demo-Saxena', 'Yoga & Fitness', 'Guest Faculty (Physical Education)', 'Yoga Therapy'],
+  ['Nikhil Demo-Bansal', 'Cricket', 'Guest Faculty (Physical Education)', 'Sports Biomechanics'],
+  ['Dr. Priya Demo-Nair', 'Badminton', 'Guest Faculty (Physical Education)', 'Sports Psychology'],
+  ['Farhan Demo-Qureshi', 'Basketball', 'Guest Faculty (Physical Education)', 'Strength & Conditioning'],
+  ['Dr. Sanjay Demo-Rathore', 'Athletics', 'Guest Faculty (Physical Education)', 'Track & Field Techniques'],
+  ['Meenal Demo-Kapoor', 'Yoga & Fitness', 'Guest Faculty (Physical Education)', 'Fitness & Nutrition'],
+  ['Dr. Tanvir Demo-Singh', 'Football', 'Guest Faculty (Physical Education)', 'Sports Management'],
+  ['Ishita Demo-Chawla', 'Badminton', 'Guest Faculty (Physical Education)', 'Racquet Sports Pedagogy'],
+  ['Dr. Rohan Demo-Pillai', 'Volleyball', 'Guest Faculty (Physical Education)', 'Team Sports Pedagogy'],
+  ['Ananya Demo-Ghosh', 'Table Tennis', 'Guest Faculty (Physical Education)', 'Motor Learning'],
+  ['Dr. Vikram Demo-Joshi', 'Swimming', 'Guest Faculty (Physical Education)', 'Aquatics & Water Safety'],
+  ['Dr. Sneha Demo-Kulkarni', 'Cricket', 'Guest Faculty (Physical Education)', 'Performance Analysis'],
+  ['Kabir Demo-Malhotra', 'Volleyball', 'Guest Faculty (Physical Education)', 'Sports Injury Management'],
+  ['Dr. Leela Demo-Menon', 'Swimming', 'Guest Faculty (Physical Education)', 'Aquatic Training'], // inactive (contract ended)
 ];
 const COACHES: [string, string, string][] = [
   ['Coach Rajesh Demo-Yadav', 'Athletics', 'Head Coach'],
@@ -103,7 +96,7 @@ export async function seed({ log = true, todayScenario = true } = {}) {
     await c.query('BEGIN');
     // Wipe data (TRUNCATE bypasses the audit log's row-level immutability trigger by design; seed only).
     await c.query(`TRUNCATE audit_logs, notifications, notification_outbox, attendance_corrections, attendance, leaves, holidays, settings,
-      password_reset_tokens, sessions, user_scopes, users, people, activities, departments RESTART IDENTITY CASCADE`);
+      password_reset_tokens, sessions, user_scopes, users, people, activities RESTART IDENTITY CASCADE`);
 
     const now = DateTime.now().setZone(TZ);
     const today = now.toISODate()!;
@@ -113,17 +106,12 @@ export async function seed({ log = true, todayScenario = true } = {}) {
     await c.query(`INSERT INTO settings (key, value) VALUES ('attendance_rules', $1), ('system', $2)`, [JSON.stringify(DEFAULT_RULES), JSON.stringify(DEFAULT_SYSTEM_SETTINGS)]);
 
     // --- Org
-    const dept = new Map<string, string>();
-    for (const [name, code] of DEPARTMENTS) {
-      const r = await c.query('INSERT INTO departments (name, code) VALUES ($1,$2) RETURNING id', [name, code]);
-      dept.set(code, r.rows[0].id);
-    }
     const act = new Map<string, string>();
     for (const [name, category] of ACTIVITIES) {
-      const r = await c.query('INSERT INTO activities (name, category, department_id) VALUES ($1,$2,$3) RETURNING id', [name, category, dept.get('SPORTS')]);
+      const r = await c.query('INSERT INTO activities (name, category) VALUES ($1,$2) RETURNING id', [name, category]);
       act.set(name, r.rows[0].id);
     }
-    await c.query(`INSERT INTO departments (name, code, status) VALUES ('Biotechnology (inactive demo)', 'BT', 'INACTIVE')`);
+    await c.query(`INSERT INTO activities (name, category, status) VALUES ('Hockey (inactive demo)', 'Outdoor', 'INACTIVE')`);
 
     // --- Holidays (fixed national holidays + one clearly-marked demo holiday)
     const holidayRows: [string, string][] = [];
@@ -146,7 +134,7 @@ export async function seed({ log = true, todayScenario = true } = {}) {
     const contractStart = start.minus({ months: 1 }).toISODate()!;
     const contractEnd = now.plus({ months: 6 }).endOf('month').toISODate()!;
     for (let i = 0; i < GUEST_FACULTY.length; i++) {
-      const [name, code, designation, spec] = GUEST_FACULTY[i];
+      const [name, activity, designation, spec] = GUEST_FACULTY[i];
       const inactive = i === GUEST_FACULTY.length - 1;
       const lateJoiner = i === 4; // joined mid-period: tests contract-window handling
       const endingSoon = i === 7; // contract ends within 30 days
@@ -154,12 +142,12 @@ export async function seed({ log = true, todayScenario = true } = {}) {
       const end = inactive ? start.plus({ days: 40 }).toISODate()! : endingSoon ? now.plus({ days: 18 }).toISODate()! : contractEnd;
       const email = emailFor(name, i, 'gf');
       const r = await c.query(
-        `INSERT INTO people (ref_id, full_name, type, department_id, designation, specialization, email, phone, joining_date, contract_start, contract_end, assigned_hours, status)
+        `INSERT INTO people (ref_id, full_name, type, activity_id, designation, specialization, email, phone, joining_date, contract_start, contract_end, assigned_hours, status)
          VALUES ($1,$2,'GUEST_FACULTY',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
         [
           `DEMO-GF-${String(i + 1).padStart(3, '0')}`,
           name,
-          dept.get(code),
+          act.get(activity),
           designation,
           spec,
           email,
@@ -177,13 +165,12 @@ export async function seed({ log = true, todayScenario = true } = {}) {
       const [name, activity, designation] = COACHES[i];
       const email = emailFor(name, i, 'coach');
       const r = await c.query(
-        `INSERT INTO people (ref_id, full_name, type, activity_id, department_id, designation, specialization, email, phone, joining_date, contract_start, contract_end, assigned_hours)
-         VALUES ($1,$2,'SPORTS_COACH',$3,$4,$5,$6,$7,$8,$9,$9,$10,$11) RETURNING id`,
+        `INSERT INTO people (ref_id, full_name, type, activity_id, designation, specialization, email, phone, joining_date, contract_start, contract_end, assigned_hours)
+         VALUES ($1,$2,'SPORTS_COACH',$3,$4,$5,$6,$7,$8,$8,$9,$10) RETURNING id`,
         [
           `DEMO-SC-${String(i + 1).padStart(3, '0')}`,
           name,
           act.get(activity),
-          dept.get('SPORTS'),
           designation,
           activity,
           email,
@@ -203,9 +190,9 @@ export async function seed({ log = true, todayScenario = true } = {}) {
       (await c.query('INSERT INTO users (name, email, password_hash, role, person_id, phone) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', [name, email, hash, role, personId, null])).rows[0].id as string;
     const superAdmin = await addUser('Demo Super Admin', 'superadmin@demo.invalid', 'SUPER_ADMIN');
     const officer = await addUser('Demo Establishment Officer', 'officer@demo.invalid', 'OFFICER');
-    const coordCse = await addUser('Demo CSE Coordinator', 'coordinator.cse@demo.invalid', 'COORDINATOR');
+    const coordField = await addUser('Demo Athletics & Football Coordinator', 'coordinator.field@demo.invalid', 'COORDINATOR');
     const coordSports = await addUser('Demo Sports Coordinator', 'coordinator.sports@demo.invalid', 'COORDINATOR');
-    await c.query('INSERT INTO user_scopes (user_id, department_id) VALUES ($1,$2), ($1,$3)', [coordCse, dept.get('CSE'), dept.get('IT')]);
+    await c.query('INSERT INTO user_scopes (user_id, activity_id) VALUES ($1,$2), ($1,$3)', [coordField, act.get('Athletics'), act.get('Football')]);
     for (const a of act.values()) await c.query('INSERT INTO user_scopes (user_id, activity_id) VALUES ($1,$2)', [coordSports, a]);
     const staffUser = new Map<string, string>();
     for (const p of people) staffUser.set(p.id, await addUser(p.name, p.email, 'STAFF', p.id));
@@ -220,7 +207,7 @@ export async function seed({ log = true, todayScenario = true } = {}) {
       { personIdx: 0, from: s(9), to: s(10), type: 'CASUAL', reason: 'Family function out of station', status: 'APPROVED', reviewer: officer },
       { personIdx: 3, from: s(22), to: s(24), type: 'MEDICAL', reason: 'Viral fever; medical certificate attached', status: 'APPROVED', reviewer: officer },
       { personIdx: 17, from: s(30), to: s(31), type: 'DUTY', reason: 'Accompanying university team to inter-university meet', status: 'APPROVED', reviewer: coordSports },
-      { personIdx: 9, from: s(40), to: s(40), type: 'PERSONAL', reason: 'Personal work at bank', status: 'REJECTED', reviewer: coordCse },
+      { personIdx: 9, from: s(40), to: s(40), type: 'PERSONAL', reason: 'Personal work at bank', status: 'REJECTED', reviewer: coordSports },
       { personIdx: 12, from: s(45), to: s(46), type: 'CASUAL', reason: 'Travel for a conference presentation', status: 'APPROVED', reviewer: officer },
       { personIdx: 20, from: s(52), to: s(53), type: 'MEDICAL', reason: 'Minor injury during training session', status: 'APPROVED', reviewer: coordSports },
       // Today: two people on approved leave
@@ -403,8 +390,8 @@ export async function seed({ log = true, todayScenario = true } = {}) {
     );
 
     await c.query('COMMIT');
-    say(`• users: superadmin / officer / coordinator.cse / coordinator.sports @demo.invalid + ${people.length} staff — password ${DEMO_PASSWORD}`);
-    return { superAdmin, officer, coordCse, coordSports, people, today };
+    say(`• users: superadmin / officer / coordinator.field / coordinator.sports @demo.invalid + ${people.length} staff — password ${DEMO_PASSWORD}`);
+    return { superAdmin, officer, coordField, coordSports, people, today };
   } catch (e) {
     await c.query('ROLLBACK');
     throw e;

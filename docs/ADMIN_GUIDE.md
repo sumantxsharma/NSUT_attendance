@@ -1,6 +1,6 @@
 # Admin Guide
 
-For **Super Admins**, **Authorized Officers** and **Department / Activity Coordinators**.
+For **Super Admins**, **Authorized Officers** and **Sport / Activity Coordinators**.
 
 ## Who can do what
 
@@ -15,7 +15,7 @@ For **Super Admins**, **Authorized Officers** and **Department / Activity Coordi
 | Approve / reject corrections (when approval is required) | ✓ | – | – | – |
 | Approve / reject leave | ✓ | ✓ | ✓ (own scope) | – |
 | Reports and export | ✓ | ✓ | ✓ (own scope) | – |
-| Users, roles, rules, system settings, departments, sports | ✓ | – | – | – |
+| Users, roles, rules, system settings, sports | ✓ | – | – | – |
 | Audit logs | ✓ | – | – | – |
 | Check in / out, apply for leave | – | – | – | ✓ |
 
@@ -32,9 +32,9 @@ The full permission matrix is under **Administration → Roles**.
    - working days
 
    Then decide how leave, holidays and weekends affect the percentage, the half-day credit, and whether officer corrections need your approval. The *Resulting formula* box shows exactly how % will be calculated. Every change is recorded in the audit log.
-3. **Departments** and **Sports & Activities**. Add or rename them; deactivate rather than delete.
+3. **Sports & Activities**. Add or rename them; deactivate rather than delete. Every Guest Faculty member and coach belongs to one.
 4. **People.** Use *Guest Faculty / Sports Coaches → Add*. Give each person a unique Employee/Reference ID. Tick *Create a login* to let them check in, and set an initial password. Alternatively, create logins later under *Users*.
-5. **Users.** Create Officers and Coordinators. For a Coordinator, tick the departments and/or sports they supervise. They will see nobody else.
+5. **Users.** Create Officers and Coordinators. For a Coordinator, tick the sports / activities they supervise. They will see nobody else.
 
 ## Daily routine (Officer / Coordinator)
 
@@ -44,7 +44,7 @@ The full permission matrix is under **Administration → Roles**.
 - attendance % this month compared with last month
 - a live presence table
 - a 30-day trend
-- a department and sport summary (lowest % first; anything under 75% is flagged *Low*)
+- a sport / activity summary (lowest % first; anything under 75% is flagged *Low*)
 - recent activity
 - items needing attention (pending leave, contracts ending within 30 days)
 
@@ -52,7 +52,7 @@ Click any number to open the matching filtered list.
 
 **Today's Attendance** is the working sheet:
 
-- Filter by type, department, sport, status or name. Filters stay in the URL, so a view can be bookmarked or shared.
+- Filter by type, sport, status or name. Filters stay in the URL, so a view can be bookmarked or shared.
 - Change the date to review a past day.
 - **Mark** records attendance for someone who has no entry. You choose Date → Person → Status → In-time → Out-time → Remarks, then **Review**. A confirmation screen shows exactly what will be saved.
 - **Correct** changes an existing entry. You see *Previous* and *Changed to* side by side, and **a reason is required**. The change appears in the person's *Audit / Corrections* history and in the audit log. If the rules require approval, the correction waits for a Super Admin under *Attendance → Corrections*.
@@ -94,7 +94,6 @@ Click any number to open the matching filtered list.
 - Daily
 - Monthly
 - Individual
-- Department-wise
 - Sports / Activity-wise
 - Absence
 - Leave
@@ -113,7 +112,7 @@ Every export is recorded in the audit log.
 
 ## People lifecycle
 
-- **Edit** a profile to change department, contract dates or assigned hours.
+- **Edit** a profile to change sport / activity, contract dates or assigned hours.
 - **Deactivate** when a contract ends. The person disappears from active lists and their login is disabled, but all history remains in reports. You can **Reactivate** later.
 - **Photograph.** Use the camera button on the profile (PNG/JPEG up to 2 MB).
 - **Contract ending soon** is flagged on the dashboard and in people lists.

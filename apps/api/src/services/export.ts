@@ -1,9 +1,7 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { APP_NAME, APP_SUBTITLE } from '@nsut/shared';
-import { config } from '../config';
+import { readStoredFile } from '../lib/upload';
 import type { Report } from './reports';
 
 // ---------------------------------------------------------------- CSV
@@ -96,7 +94,8 @@ function pdfText(v: unknown): string {
     .replace(/[^ -~\u00A1-\u00FF\u2014\u2022]/g, (c) => (c === '\u00A0' ? ' ' : '?'));
 }
 
-export function toPdf(r: Report): Promise<Buffer> {
+export async function toPdf(r: Report): Promise<Buffer> {
+  const logo = await readStoredFile(r.meta.logoPath);
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 40, bottom: 50, left: 36, right: 36 }, bufferPages: true, info: { Title: pdfText(`${r.title} - ${r.period}`), Author: APP_NAME, Creator: APP_NAME } });
     const chunks: Buffer[] = [];
@@ -112,10 +111,9 @@ export function toPdf(r: Report): Promise<Buffer> {
 
     // --- Letterhead
     const logoSize = 46;
-    const logoFile = r.meta.logoPath ? path.join(config.uploadDir, r.meta.logoPath) : null;
-    if (logoFile && fs.existsSync(logoFile)) {
+    if (logo) {
       try {
-        doc.image(logoFile, left, 36, { fit: [logoSize, logoSize] });
+        doc.image(logo.data, left, 36, { fit: [logoSize, logoSize] });
       } catch {
         /* unreadable logo: fall back to placeholder */
       }

@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -26,7 +25,7 @@ import { enqueueExternal } from '../lib/notify';
 import { peopleScopeSql } from '../lib/scope';
 import { loadSettings, saveSetting } from '../lib/settings';
 import { likePattern, Params } from '../lib/sql';
-import { MIME_BY_EXT, memoryUpload, resolveUpload, saveValidatedFile } from '../lib/upload';
+import { memoryUpload, saveValidatedFile, sendStoredFile } from '../lib/upload';
 import { randomToken, requireAuth, requirePerm, sha256 } from '../middleware/auth';
 import { dashboard } from '../services/dashboard';
 import { BCRYPT_ROUNDS, publicSettings } from './auth';
@@ -39,11 +38,7 @@ publicRouter.get(
   ah(async (_req, res) => {
     const { system } = await loadSettings();
     if (!system.logoPath) throw notFound('Logo');
-    const full = resolveUpload(system.logoPath);
-    if (!fs.existsSync(full)) throw notFound('Logo');
-    res.setHeader('Content-Type', MIME_BY_EXT[full.split('.').pop()!] ?? 'application/octet-stream');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    fs.createReadStream(full).pipe(res);
+    await sendStoredFile(res, system.logoPath, 'Logo', { 'Cache-Control': 'public, max-age=3600' });
   }),
 );
 
@@ -67,9 +62,9 @@ adminRouter.get(
     const p = new Params();
     const pat = p.add(likePattern(q));
     const rows = await query(
-      `SELECT p.id, p.full_name AS "fullName", p.ref_id AS "refId", p.type, p.status, d.name AS "departmentName", a.name AS "activityName"
-       FROM people p LEFT JOIN departments d ON d.id = p.department_id LEFT JOIN activities a ON a.id = p.activity_id
-       WHERE p.deleted_at IS NULL AND ${peopleScopeSql(req, p)} AND (p.full_name ILIKE ${pat} OR p.ref_id ILIKE ${pat} OR d.name ILIKE ${pat} OR d.code ILIKE ${pat} OR a.name ILIKE ${pat} OR a.category ILIKE ${pat})
+      `SELECT p.id, p.full_name AS "fullName", p.ref_id AS "refId", p.type, p.status, a.name AS "activityName"
+       FROM people p LEFT JOIN activities a ON a.id = p.activity_id
+       WHERE p.deleted_at IS NULL AND ${peopleScopeSql(req, p)} AND (p.full_name ILIKE ${pat} OR p.ref_id ILIKE ${pat} OR a.name ILIKE ${pat} OR a.category ILIKE ${pat})
        ORDER BY (p.status = 'ACTIVE') DESC, p.full_name LIMIT 12`,
       p.values,
     );
@@ -110,8 +105,8 @@ adminRouter.patch(
 // ------------------------------------------------------------------ users & roles
 const USER_SELECT = `u.id, u.name, u.email, u.phone, u.role, u.status, u.person_id AS "personId", p.full_name AS "personName",
   u.last_login AS "lastLogin", u.created_at AS "createdAt", (u.locked_until > now()) AS "locked",
-  COALESCE((SELECT json_agg(json_build_object('departmentId', s.department_id, 'departmentName', d.name, 'activityId', s.activity_id, 'activityName', a.name))
-     FROM user_scopes s LEFT JOIN departments d ON d.id = s.department_id LEFT JOIN activities a ON a.id = s.activity_id WHERE s.user_id = u.id), '[]') AS scopes`;
+  COALESCE((SELECT json_agg(json_build_object('activityId', s.activity_id, 'activityName', a.name))
+     FROM user_scopes s JOIN activities a ON a.id = s.activity_id WHERE s.user_id = u.id), '[]') AS scopes`;
 
 adminRouter.get(
   '/users',
@@ -137,10 +132,9 @@ adminRouter.get('/roles', requireAuth, (_req, res) => {
   });
 });
 
-async function setScopes(c: any, userId: string, role: string, deptIds: string[] = [], actIds: string[] = []) {
+async function setScopes(c: any, userId: string, role: string, actIds: string[] = []) {
   await c.query('DELETE FROM user_scopes WHERE user_id = $1', [userId]);
   if (role !== 'COORDINATOR') return;
-  for (const d of [...new Set(deptIds)]) await c.query('INSERT INTO user_scopes (user_id, department_id) VALUES ($1,$2)', [userId, d]);
   for (const a of [...new Set(actIds)]) await c.query('INSERT INTO user_scopes (user_id, activity_id) VALUES ($1,$2)', [userId, a]);
 }
 
@@ -150,8 +144,7 @@ adminRouter.post(
   ah(async (req, res) => {
     const b = createUserSchema.parse(req.body);
     if (b.role === 'STAFF' && !b.personId) throw badRequest('A staff account must be linked to a Guest Faculty / Coach profile.');
-    if (b.role === 'COORDINATOR' && b.scopeDepartmentIds.length + b.scopeActivityIds.length === 0)
-      throw badRequest('Assign at least one department or sport/activity to a coordinator.');
+    if (b.role === 'COORDINATOR' && b.scopeActivityIds.length === 0) throw badRequest('Assign at least one sport/activity to a coordinator.');
     const hash = await bcrypt.hash(b.password, BCRYPT_ROUNDS);
     const row = await tx(async (c) => {
       const u = await one(
@@ -159,8 +152,8 @@ adminRouter.post(
         [b.name, b.email, b.phone ?? null, hash, b.role, b.role === 'STAFF' ? b.personId : null],
         c,
       );
-      await setScopes(c, u.id, b.role, b.scopeDepartmentIds, b.scopeActivityIds);
-      await audit({ action: 'USER_CREATE', entityType: 'user', entityId: u.id, summary: `Created ${ROLE_LABELS[b.role]} account for ${b.name}`, newValue: { ...u, scopes: { departments: b.scopeDepartmentIds, activities: b.scopeActivityIds } } }, req, c);
+      await setScopes(c, u.id, b.role, b.scopeActivityIds);
+      await audit({ action: 'USER_CREATE', entityType: 'user', entityId: u.id, summary: `Created ${ROLE_LABELS[b.role]} account for ${b.name}`, newValue: { ...u, scopes: { activities: b.scopeActivityIds } } }, req, c);
       return u;
     });
     res.status(201).json(row);
@@ -181,11 +174,10 @@ adminRouter.patch(
       const personId = role === 'STAFF' ? (b.personId !== undefined ? b.personId : before.personId) : null;
       if (role === 'STAFF' && !personId) throw badRequest('A staff account must be linked to a Guest Faculty / Coach profile.');
       await c.query('UPDATE users SET name = $2, phone = $3, role = $4, person_id = $5 WHERE id = $1', [id, b.name ?? before.name, b.phone !== undefined ? b.phone : before.phone, role, personId]);
-      if (b.scopeDepartmentIds !== undefined || b.scopeActivityIds !== undefined || b.role) {
-        const deptIds = b.scopeDepartmentIds ?? before.scopes.map((s: any) => s.departmentId).filter(Boolean);
-        const actIds = b.scopeActivityIds ?? before.scopes.map((s: any) => s.activityId).filter(Boolean);
-        if (role === 'COORDINATOR' && deptIds.length + actIds.length === 0) throw badRequest('Assign at least one department or sport/activity to a coordinator.');
-        await setScopes(c, id, role, deptIds, actIds);
+      if (b.scopeActivityIds !== undefined || b.role) {
+        const actIds = b.scopeActivityIds ?? before.scopes.map((s: any) => s.activityId);
+        if (role === 'COORDINATOR' && actIds.length === 0) throw badRequest('Assign at least one sport/activity to a coordinator.');
+        await setScopes(c, id, role, actIds);
       }
       if (b.role && b.role !== before.role) await c.query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
       const after = await one(`SELECT ${USER_SELECT} FROM users u LEFT JOIN people p ON p.id = u.person_id WHERE u.id = $1`, [id], c);
@@ -292,11 +284,12 @@ adminRouter.post(
   requirePerm('settings.manage'),
   memoryUpload(1).single('logo'),
   ah(async (req, res) => {
-    const saved = saveValidatedFile(req.file, ['image/png', 'image/jpeg'], 'branding');
-    if (!saved) throw badRequest('Choose a PNG or JPEG logo to upload.');
+    if (!req.file) throw badRequest('Choose a PNG or JPEG logo to upload.');
     const { system } = await loadSettings();
     await tx(async (c) => {
+      const saved = (await saveValidatedFile(req.file, ['image/png', 'image/jpeg'], 'branding', c))!;
       await saveSetting('system', { ...system, logoPath: saved.path }, req.auth!.user.id, c);
+      if (system.logoPath) await c.query('DELETE FROM stored_files WHERE key = $1', [system.logoPath]);
       await audit({ action: 'SETTINGS_LOGO_UPDATE', entityType: 'settings', entityId: 'system', summary: 'Uploaded university logo', oldValue: { logoPath: system.logoPath }, newValue: { logoPath: saved.path } }, req, c);
     });
     res.json({ ok: true });
@@ -310,6 +303,7 @@ adminRouter.delete(
     const { system } = await loadSettings();
     await tx(async (c) => {
       await saveSetting('system', { ...system, logoPath: null }, req.auth!.user.id, c);
+      if (system.logoPath) await c.query('DELETE FROM stored_files WHERE key = $1', [system.logoPath]);
       await audit({ action: 'SETTINGS_LOGO_UPDATE', entityType: 'settings', entityId: 'system', summary: 'Removed university logo', oldValue: { logoPath: system.logoPath }, newValue: { logoPath: null } }, req, c);
     });
     res.json({ ok: true });

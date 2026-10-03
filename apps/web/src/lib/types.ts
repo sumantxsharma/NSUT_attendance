@@ -13,7 +13,7 @@ export interface Me {
     refId: string | null;
     lastLogin: string | null;
     permissions: Permission[];
-    scopes: { departmentId: string | null; departmentName: string | null; activityId: string | null; activityName: string | null }[];
+    scopes: { activityId: string; activityName: string }[];
   };
   csrfToken: string;
 }
@@ -34,9 +34,6 @@ export interface Person {
   fullName: string;
   type: PersonType;
   status: 'ACTIVE' | 'INACTIVE';
-  departmentId: string | null;
-  departmentName: string | null;
-  departmentCode: string | null;
   activityId: string | null;
   activityName: string | null;
   designation: string | null;
@@ -156,7 +153,6 @@ export interface Leave {
   personName: string;
   refId: string;
   personType: PersonType;
-  departmentName: string | null;
   activityName: string | null;
   fromDate: string;
   toDate: string;
@@ -173,20 +169,11 @@ export interface Leave {
   days: number;
 }
 
-export interface Department {
-  id: string;
-  name: string;
-  code: string;
-  status: 'ACTIVE' | 'INACTIVE';
-  activePeople: number;
-}
 export interface Activity {
   id: string;
   name: string;
   category: string;
   status: 'ACTIVE' | 'INACTIVE';
-  departmentId: string | null;
-  departmentName: string | null;
   activePeople: number;
 }
 

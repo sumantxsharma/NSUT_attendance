@@ -57,7 +57,7 @@ export async function reviewersFor(personId: string, client: Queryable = pool): 
      JOIN people p ON p.id = $1
      WHERE u.status = 'ACTIVE' AND u.deleted_at IS NULL AND (
        u.role IN ('SUPER_ADMIN', 'OFFICER') OR
-       (u.role = 'COORDINATOR' AND (s.department_id = p.department_id OR s.activity_id = p.activity_id))
+       (u.role = 'COORDINATOR' AND s.activity_id = p.activity_id)
      )`,
     [personId],
     client,

@@ -51,4 +51,4 @@ The system stores only what attendance needs: your profile details, check-in and
 
 ## Help
 
-Contact your department / activity coordinator or the Establishment Section.
+Contact your sport / activity coordinator or the Establishment Section.

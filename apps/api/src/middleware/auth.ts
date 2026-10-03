@@ -20,7 +20,7 @@ export interface AuthContext {
   user: AuthUser;
   sessionId: string;
   csrf: string;
-  scope: { departmentIds: string[]; activityIds: string[] };
+  scope: { activityIds: string[] };
 }
 
 declare global {
@@ -59,14 +59,8 @@ export function clearSessionCookies(res: Response) {
 }
 
 async function loadScope(userId: string) {
-  const rows = await query<{ department_id: string | null; activity_id: string | null }>(
-    'SELECT department_id, activity_id FROM user_scopes WHERE user_id = $1',
-    [userId],
-  );
-  return {
-    departmentIds: rows.map((r) => r.department_id).filter(Boolean) as string[],
-    activityIds: rows.map((r) => r.activity_id).filter(Boolean) as string[],
-  };
+  const rows = await query<{ activity_id: string }>('SELECT activity_id FROM user_scopes WHERE user_id = $1', [userId]);
+  return { activityIds: rows.map((r) => r.activity_id) };
 }
 
 /** Resolve the session cookie (if any) into req.auth. Never throws for missing/invalid sessions. */
@@ -96,7 +90,7 @@ export async function sessionMiddleware(req: Request, res: Response, next: NextF
       user: { id: row.id, name: row.name, email: row.email, role: row.role, personId: row.person_id },
       sessionId: row.session_id,
       csrf: row.csrf_token,
-      scope: row.role === 'COORDINATOR' ? await loadScope(row.id) : { departmentIds: [], activityIds: [] },
+      scope: row.role === 'COORDINATOR' ? await loadScope(row.id) : { activityIds: [] },
     };
     next();
   } catch (e) {

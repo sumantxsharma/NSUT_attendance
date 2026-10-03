@@ -70,10 +70,10 @@
     @apply mb-1 block text-[13px] font-medium text-ink;
   }
   .panel {
-    @apply rounded-md border border-line bg-white;
+    @apply rounded-md border border-line bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)];
   }
   .panel-head {
-    @apply flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3;
+    @apply flex min-h-[52px] flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5;
   }
   .panel-title {
     @apply text-[15px] font-semibold text-ink;
@@ -82,13 +82,16 @@
     @apply w-full border-collapse text-sm;
   }
   .table th {
-    @apply border-b border-line bg-[#F7F8FA] px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-muted whitespace-nowrap;
+    @apply border-b border-line bg-[#F9FAFB] px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-muted whitespace-nowrap;
   }
   .table td {
-    @apply border-b border-[#ECEEF2] px-3 py-2.5 align-middle;
+    @apply border-b border-[#EEF0F3] px-3 py-2.5 align-middle;
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
   }
   .table tbody tr:hover td {
-    @apply bg-[#FAFBFC];
+    @apply bg-[#F9FAFB];
   }
   .kbd {
     @apply rounded border border-line bg-[#F7F8FA] px-1.5 py-0.5 font-mono text-2xs text-muted;

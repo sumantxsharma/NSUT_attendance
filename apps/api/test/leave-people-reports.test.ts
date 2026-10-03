@@ -53,8 +53,8 @@ describe('leave workflow', () => {
   it('only reviewers in scope can approve; rejection needs remarks', async () => {
     const staff = await login('coach07.neha@demo.invalid');
     expect((await staff.patch(`/api/leave/${leaveId}/approve`)).status).toBe(403);
-    const coordCse = await login('coordinator.cse@demo.invalid');
-    expect((await coordCse.patch(`/api/leave/${leaveId}/approve`)).status).toBe(404);
+    const coordField = await login('coordinator.field@demo.invalid');
+    expect((await coordField.patch(`/api/leave/${leaveId}/approve`)).status).toBe(404);
     const coord = await login(COORD_SPORTS);
     expect((await coord.patch(`/api/leave/${leaveId}/reject`, { remarks: '' })).status).toBe(400);
   });
@@ -97,12 +97,12 @@ describe('leave workflow', () => {
 describe('people management', () => {
   it('creates a person with a login, rejects duplicates, edits and deactivates', async () => {
     const admin = await login(ADMIN);
-    const dept = (await admin.get('/api/departments')).body.find((d: any) => d.code === 'ME');
-    const body = { refId: 'TEST-GF-900', fullName: 'Test Person Demo', type: 'GUEST_FACULTY', departmentId: dept.id, email: 'test.person@demo.invalid', createLogin: true, initialPassword: 'Welcome2026x' };
+    const sport = (await admin.get('/api/activities')).body.find((a: any) => a.name === 'Swimming');
+    const body = { refId: 'TEST-GF-900', fullName: 'Test Person Demo', type: 'GUEST_FACULTY', activityId: sport.id, email: 'test.person@demo.invalid', createLogin: true, initialPassword: 'Welcome2026x' };
     const r = await admin.post('/api/people', body);
     expect(r.status).toBe(201);
     expect((await admin.post('/api/people', body)).status).toBe(409);
-    expect((await admin.post('/api/people', { ...body, refId: 'TEST-GF-901', departmentId: null })).status).toBe(400);
+    expect((await admin.post('/api/people', { ...body, refId: 'TEST-GF-901', activityId: null })).status).toBe(400);
     const edit = await admin.patch(`/api/people/${r.body.id}`, { ...body, fullName: 'Test Person Edited', designation: 'Visiting Lecturer' });
     expect(edit.status).toBe(200);
     const staff = await login('test.person@demo.invalid', 'Welcome2026x');
@@ -122,11 +122,11 @@ describe('people management', () => {
     expect((await s.post('/api/people', {})).status).toBe(403);
   });
 
-  it('searches across name, reference ID, department and sport', async () => {
+  it('searches across name, reference ID and sport', async () => {
     const s = await login(ADMIN);
     expect((await s.get('/api/search?q=DEMO-SC-003')).body[0].refId).toBe('DEMO-SC-003');
-    expect((await s.get('/api/search?q=Badminton')).body.length).toBe(2);
-    expect((await s.get('/api/people?q=mechanical')).body.total).toBe(3);
+    expect((await s.get('/api/search?q=Badminton')).body.length).toBe(4);
+    expect((await s.get('/api/people?q=yoga')).body.total).toBe(3);
     // SQL wildcards in input are treated literally
     expect((await s.get('/api/people?q=%25')).body.total).toBe(0);
   });
@@ -171,10 +171,10 @@ describe('reports and exports', () => {
   });
 
   it('scopes coordinator reports', async () => {
-    const s = await login(COORD_SPORTS);
+    const s = await login('coordinator.field@demo.invalid');
     const r = await s.get('/api/reports/daily');
-    expect(r.body.rows.length).toBe(10);
-    expect(r.body.rows.every((x: any) => x.type === 'Sports Coach')).toBe(true);
+    expect(r.body.rows.length).toBe(8);
+    expect(r.body.rows.every((x: any) => ['Athletics', 'Football'].includes(x.unit))).toBe(true);
   });
 });
 

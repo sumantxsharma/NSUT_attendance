@@ -57,9 +57,6 @@ export interface PersonLite {
   full_name: string;
   type: PersonType;
   status: 'ACTIVE' | 'INACTIVE';
-  department_id: string | null;
-  department_name: string | null;
-  department_code: string | null;
   activity_id: string | null;
   activity_name: string | null;
   designation: string | null;
@@ -73,7 +70,6 @@ export interface PersonLite {
 export interface Filters {
   q?: string;
   type?: PersonType;
-  departmentId?: string;
   activityId?: string;
   personId?: string;
   status?: string;
@@ -135,9 +131,6 @@ export function serializePerson(p: PersonLite) {
     fullName: p.full_name,
     type: p.type,
     status: p.status,
-    departmentId: p.department_id,
-    departmentName: p.department_name,
-    departmentCode: p.department_code,
     activityId: p.activity_id,
     activityName: p.activity_name,
     designation: p.designation,
@@ -150,10 +143,10 @@ export function serializePerson(p: PersonLite) {
 }
 
 export const PERSON_SELECT = `
-  p.id, p.ref_id, p.full_name, p.type, p.status, p.department_id, d.name AS department_name, d.code AS department_code,
+  p.id, p.ref_id, p.full_name, p.type, p.status,
   p.activity_id, a.name AS activity_name, p.designation, p.joining_date, p.contract_start, p.contract_end,
   p.assigned_hours, p.photo_path`;
-export const PERSON_JOINS = `LEFT JOIN departments d ON d.id = p.department_id LEFT JOIN activities a ON a.id = p.activity_id`;
+export const PERSON_JOINS = `LEFT JOIN activities a ON a.id = p.activity_id`;
 
 // ----------------------------------------------------------------------------- helpers
 
@@ -177,12 +170,11 @@ export async function scopedPeople(req: Request, filters: Filters, opts: { inclu
   const p = new Params();
   const where: string[] = ['p.deleted_at IS NULL', peopleScopeSql(req, p)];
   if (filters.type) where.push(`p.type = ${p.add(filters.type)}`);
-  if (filters.departmentId) where.push(`p.department_id = ${p.add(filters.departmentId)}`);
   if (filters.activityId) where.push(`p.activity_id = ${p.add(filters.activityId)}`);
   if (filters.personId) where.push(`p.id = ${p.add(filters.personId)}`);
   if (filters.q) {
     const q = p.add(likePattern(filters.q));
-    where.push(`(p.full_name ILIKE ${q} OR p.ref_id ILIKE ${q} OR d.name ILIKE ${q} OR d.code ILIKE ${q} OR a.name ILIKE ${q} OR a.category ILIKE ${q})`);
+    where.push(`(p.full_name ILIKE ${q} OR p.ref_id ILIKE ${q} OR a.name ILIKE ${q} OR a.category ILIKE ${q})`);
   }
   if (opts.includeInactiveWithRecords) {
     const { from, to } = opts.includeInactiveWithRecords;

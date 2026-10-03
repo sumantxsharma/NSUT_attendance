@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 import clsx from 'clsx';
-import { CalendarDays, ClipboardEdit, Info, Plus } from 'lucide-react';
+import { CalendarDays, Info, Plus } from 'lucide-react';
 import { ATTENDANCE_STATUS_LABELS, formatDateTimeLocal, formatTimeLocal, PERSON_TYPE_LABELS, PRESENCE_LABELS, type AttendanceStatus, type PersonType } from '@nsut/shared';
 import { api } from '../lib/api';
 import { useAuth, useTz } from '../lib/auth';
@@ -23,12 +23,17 @@ export function TodayAttendancePage() {
   const tz = useTz();
   const { can } = useAuth();
   const today = nowParts(tz).date;
-  const [f, setF] = useUrlState<{ date?: string; type?: string; departmentId?: string; activityId?: string; status?: string; q?: string }>({});
+  const [f, setF] = useUrlState<{ date?: string; type?: string; activityId?: string; status?: string; q?: string }>({});
   const date = f.date ?? today;
   const q = useQuery({ queryKey: ['daily', date, f], queryFn: () => api.get<DailySheet>('/attendance/daily', { ...cleanFilters(f as FilterValues), date }) });
   const [marking, setMarking] = useState<{ person?: SheetRow['person'] } | null>(null);
   const [correcting, setCorrecting] = useState<{ record: AttRecord; name: string } | null>(null);
   const d = q.data;
+  // People with no working day today (e.g. faculty on a weekend) are tucked away unless asked for.
+  const [showOff, setShowOff] = useState(false);
+  const isOff = (r: SheetRow) => r.status === 'NOT_MARKED' && !r.isWorkingDay;
+  const offCount = d?.rows.filter(isOff).length ?? 0;
+  const sheetRows = d ? (showOff ? d.rows : d.rows.filter((r) => !isOff(r))) : [];
 
   const statusOptions = [
     ...(['PRESENT', 'HALF_DAY', 'ABSENT', 'LEAVE', 'NOT_MARKED', 'HOLIDAY'] as AttendanceStatus[]).map((s) => ({ value: s, label: ATTENDANCE_STATUS_LABELS[s] })),
@@ -72,7 +77,7 @@ export function TodayAttendancePage() {
         }
       >
         <div className="border-b border-line px-4 py-3">
-          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...v, date: f.date } as any, true)} show={['q', 'type', 'department', 'activity', 'status']} statusOptions={statusOptions}>
+          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...v, date: f.date } as any, true)} show={['q', 'type', 'activity', 'status']} statusOptions={statusOptions}>
             <label>
               <span className="sr-only">Date</span>
               <input type="date" className="input w-auto" max={today} value={date} onChange={(e) => setF({ date: e.target.value === today ? undefined : e.target.value })} />
@@ -85,7 +90,7 @@ export function TodayAttendancePage() {
           <ErrorState error={q.error} onRetry={() => q.refetch()} />
         ) : (
           <DataTable
-            rows={d!.rows}
+            rows={sheetRows}
             rowKey={(r) => r.person.id}
             caption="Daily attendance"
             empty={<EmptyState title="No attendance records found for the selected filters." body="Try clearing a filter or choosing another date." />}
@@ -110,13 +115,23 @@ export function TodayAttendancePage() {
                       <Link to={`/people/${r.person.id}`} className="whitespace-nowrap font-medium text-ink">
                         {r.person.fullName}
                       </Link>
-                      <p className="whitespace-nowrap font-mono text-2xs text-muted">{r.person.refId}</p>
+                      <p className="whitespace-nowrap text-2xs text-muted">
+                        <span className="font-mono">{r.person.refId}</span> · {PERSON_TYPE_LABELS[r.person.type]}
+                      </p>
                     </div>
                   </div>
                 ),
               },
-              { key: 'type', header: 'Type', sortValue: (r) => r.person.type, cell: (r) => <span className="whitespace-nowrap">{PERSON_TYPE_LABELS[r.person.type]}</span> },
-              { key: 'unit', header: 'Department / Sport', sortValue: (r) => unitName(r.person), cell: (r) => <span className="text-[13px]">{unitName(r.person)}</span> },
+              {
+                key: 'unit',
+                header: 'Sport / Activity',
+                sortValue: (r) => unitName(r.person),
+                cell: (r) => (
+                  <span className="block max-w-[220px] truncate text-[13px]" title={unitName(r.person)}>
+                    {unitName(r.person)}
+                  </span>
+                ),
+              },
               { key: 'status', header: 'Status', hideOnCard: true, sortValue: (r) => r.presence, cell: (r) => (r.status === 'NOT_MARKED' && !r.isWorkingDay ? <span className="text-xs text-muted">Non-working day</span> : <PresenceBadge presence={r.presence} />) },
               {
                 key: 'in',
@@ -149,13 +164,13 @@ export function TodayAttendancePage() {
                       cell: (r: SheetRow) =>
                         r.record
                           ? can('attendance.correct') && (
-                              <Button size="sm" variant="ghost" onClick={() => setCorrecting({ record: r.record!, name: r.person.fullName })} aria-label={`Correct attendance for ${r.person.fullName}`}>
-                                <ClipboardEdit className="h-4 w-4" /> Correct
+                              <Button size="sm" variant="ghost" className="text-muted" onClick={() => setCorrecting({ record: r.record!, name: r.person.fullName })} aria-label={`Correct attendance for ${r.person.fullName}`}>
+                                Correct
                               </Button>
                             )
                           : can('attendance.mark') &&
                             r.person.status === 'ACTIVE' && (
-                              <Button size="sm" onClick={() => setMarking({ person: r.person })} aria-label={`Mark attendance for ${r.person.fullName}`}>
+                              <Button size="sm" variant="ghost" className="text-brand-700" onClick={() => setMarking({ person: r.person })} aria-label={`Mark attendance for ${r.person.fullName}`}>
                                 Mark
                               </Button>
                             ),
@@ -164,6 +179,13 @@ export function TodayAttendancePage() {
                 : []),
             ]}
           />
+        )}
+        {offCount > 0 && (
+          <div className="border-t border-line px-4 py-2.5 text-sm" data-noprint>
+            <button type="button" className="text-brand-700 hover:underline" onClick={() => setShowOff((v) => !v)} aria-expanded={showOff}>
+              {showOff ? 'Hide' : 'Show'} {offCount} {offCount === 1 ? 'person' : 'people'} with no working day on this date
+            </button>
+          </div>
         )}
       </PanelBox>
       <ManualMarkDialog open={!!marking} onOpenChange={(o) => !o && setMarking(null)} preset={{ date, person: marking?.person }} maxDate={today} />
@@ -175,7 +197,7 @@ export function TodayAttendancePage() {
 // ============================================================ Live presence
 export function LivePresencePage() {
   const tz = useTz();
-  const [f, setF] = useUrlState<{ type?: string; departmentId?: string; activityId?: string; status?: string }>({});
+  const [f, setF] = useUrlState<{ type?: string; activityId?: string; status?: string }>({});
   const q = useQuery({ queryKey: ['daily', 'live', f], queryFn: () => api.get<DailySheet>('/attendance/today', cleanFilters(f as FilterValues)), refetchInterval: 30_000 });
   const d = q.data;
   const groups: { key: string; label: string; match: (r: SheetRow) => boolean }[] = [
@@ -206,7 +228,7 @@ export function LivePresencePage() {
       </div>
       <PanelBox>
         <div className="border-b border-line px-4 py-3">
-          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...v, status: f.status } as any, true)} show={['type', 'department', 'activity']} />
+          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...v, status: f.status } as any, true)} show={['type', 'activity']} />
         </div>
         {q.isLoading ? <TableSkeleton rows={8} cols={7} /> : q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : <LiveTable rows={rows} tz={tz} showExpected />}
       </PanelBox>
@@ -286,10 +308,10 @@ export function MonthlyPage() {
   const tz = useTz();
   const now = nowParts(tz);
   const nav = useNavigate();
-  const [f, setF] = useUrlState<{ year?: string; month?: string; type?: string; departmentId?: string; activityId?: string; personId?: string; q?: string }>({});
+  const [f, setF] = useUrlState<{ year?: string; month?: string; type?: string; activityId?: string; personId?: string; q?: string }>({});
   const year = Number(f.year ?? now.year);
   const month = Number(f.month ?? now.month);
-  const filters = cleanFilters({ type: f.type as PersonType, departmentId: f.departmentId, activityId: f.activityId, personId: f.personId, q: f.q });
+  const filters = cleanFilters({ type: f.type as PersonType, activityId: f.activityId, personId: f.personId, q: f.q });
   const q = useQuery({ queryKey: ['monthly', year, month, filters], queryFn: () => api.get<{ rows: MonthlyRow[] }>('/attendance/monthly', { year, month, ...filters }) });
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => api.get<{ formula: string[] }>('/settings') });
   const [showFormula, setShowFormula] = useState(false);
@@ -315,7 +337,7 @@ export function MonthlyPage() {
       />
       <PanelBox>
         <div className="border-b border-line px-4 py-3">
-          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...v, year: f.year, month: f.month } as any, true)} show={['q', 'type', 'department', 'activity', 'person']}>
+          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...v, year: f.year, month: f.month } as any, true)} show={['q', 'type', 'activity', 'person']}>
             <MonthPicker year={year} month={month} onChange={(y, m) => setF({ year: String(y), month: String(m) })} max={now} />
           </FilterBar>
         </div>

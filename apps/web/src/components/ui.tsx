@@ -85,12 +85,12 @@ export function fieldErrors(error: unknown): Record<string, string> {
 }
 
 // ---------------------------------------------------------------- Page header
-export function PageHeader({ title, subtitle, actions, eyebrow }: { title: string; subtitle?: ReactNode; actions?: ReactNode; eyebrow?: string }) {
+// `eyebrow` is accepted for compatibility; section context now comes from the sidebar and tab strip.
+export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode; eyebrow?: string }) {
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        {eyebrow && <p className="text-2xs font-semibold uppercase tracking-wider text-muted">{eyebrow}</p>}
-        <h1 className="text-[22px] font-semibold leading-tight">{title}</h1>
+        <h1 className="text-xl font-semibold leading-tight tracking-[-0.01em]">{title}</h1>
         {subtitle && <div className="mt-1 text-sm text-muted">{subtitle}</div>}
       </div>
       {actions && (

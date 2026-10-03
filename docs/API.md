@@ -56,9 +56,9 @@ Base path: `/api`. JSON in and out, except uploads (multipart) and exports (file
 | GET | `/attendance/me/month?year&month` | attendance.self | Own calendar and summary |
 | POST | `/attendance/check-in` | attendance.self | `201 {message:"Attendance marked successfully", record}`; `409` if already marked, on leave, or after check-out |
 | POST | `/attendance/check-out` | attendance.self | `400` before check-in; `409` if already checked out |
-| GET | `/attendance/today?type&departmentId&activityId&status&q` | attendance.read | Daily sheet for today |
+| GET | `/attendance/today?type&activityId&status&q` | attendance.read | Daily sheet for today |
 | GET | `/attendance/daily?date&…filters` | attendance.read | Daily sheet for any past date. `status` accepts attendance statuses and presence states (`CURRENTLY_PRESENT`) |
-| GET | `/attendance/monthly?year&month&type&departmentId&activityId&personId&q` | attendance.read | Per-person monthly summary |
+| GET | `/attendance/monthly?year&month&type&activityId&personId&q` | attendance.read | Per-person monthly summary |
 | GET | `/attendance/person/:id?year&month` | attendance.read (or own) | Calendar days with evaluation and summary |
 | POST | `/attendance/manual` | attendance.mark | `{personId, date, status, checkIn?, checkOut?, remarks?}`; `409` if a record exists |
 | PATCH | `/attendance/:id` | attendance.correct | `{status, checkIn?, checkOut?, remarks?, reason, version?}` → `{pendingApproval, record}` |
@@ -70,7 +70,7 @@ Base path: `/api`. JSON in and out, except uploads (multipart) and exports (file
 
 ```json
 {
-  "person": { "id": "…", "refId": "DEMO-GF-001", "fullName": "…", "type": "GUEST_FACULTY", "departmentName": "…", "activityName": null, "status": "ACTIVE" },
+  "person": { "id": "…", "refId": "DEMO-GF-001", "fullName": "…", "type": "GUEST_FACULTY", "activityName": "Athletics", "status": "ACTIVE" },
   "record": { "id": "…", "status": "PRESENT", "checkInAt": "2026-09-28T03:44:00.000Z", "checkOutAt": null, "durationMinutes": null,
               "lateMinutes": 0, "isLate": false, "earlyMinutes": 0, "isEarlyDeparture": false, "isIncomplete": false,
               "markingMethod": "SELF", "remarks": null, "version": 1 },
@@ -86,25 +86,23 @@ Base path: `/api`. JSON in and out, except uploads (multipart) and exports (file
 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
-| GET | `/people?q&type&departmentId&activityId&status(ACTIVE\|INACTIVE\|ALL)&page&pageSize&sort` | people.read | Scoped for coordinators |
+| GET | `/people?q&type&activityId&status(ACTIVE\|INACTIVE\|ALL)&page&pageSize&sort` | people.read | Scoped for coordinators |
 | GET | `/people/:id` | people.read (or own) | Includes login summary |
 | POST | `/people` | people.write | Person fields + optional `{createLogin, initialPassword}` |
 | PATCH | `/people/:id` | people.write | Full person object |
 | POST | `/people/:id/deactivate` \| `/activate` | people.write | `{reason?}`; deactivation also disables the login and ends sessions |
 | POST | `/people/:id/photo` | people.write | multipart `photo` (PNG/JPEG ≤ 2 MB, validated by content) |
 | GET | `/people/:id/photo` | people.read (or own) | Streams the image |
-| GET | `/search?q` | people.read | Global search: name, ref ID, department, sport/activity |
-| GET | `/departments?all=true` | signed in | |
-| POST / PATCH | `/departments`, `/departments/:id` | org.manage | `{name, code, status?}` |
+| GET | `/search?q` | people.read | Global search: name, ref ID, sport/activity |
 | GET | `/activities?all=true` | signed in | |
-| POST / PATCH | `/activities`, `/activities/:id` | org.manage | `{name, category, departmentId?, status?}` |
+| POST / PATCH | `/activities`, `/activities/:id` | org.manage | `{name, category, status?}` |
 
 ## Leave
 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
 | POST | `/leave` | leave.self or leave.review | multipart: `fromDate, toDate, leaveType, reason, personId?` (reviewers), `document?` (PDF/PNG/JPEG ≤ 5 MB) |
-| GET | `/leave?status&personId&from&to&q&type&departmentId&activityId` | leave.self (own) / leave.review (scoped) | |
+| GET | `/leave?status&personId&from&to&q&type&activityId` | leave.self (own) / leave.review (scoped) | |
 | GET | `/leave/:id` | same | |
 | PATCH | `/leave/:id/approve` | leave.review | `{remarks?}` → `{leave, sync:{applied:[dates], skipped:[{date,reason}]}}` |
 | PATCH | `/leave/:id/reject` | leave.review | `{remarks}` (required) |
@@ -117,13 +115,12 @@ Base path: `/api`. JSON in and out, except uploads (multipart) and exports (file
 
 | Type | Period parameters | Other filters |
 |---|---|---|
-| `daily` | `date` | type, departmentId, activityId, status, q |
-| `monthly` | `year`, `month` | type, departmentId, activityId, personId, q |
+| `daily` | `date` | type, activityId, status, q |
+| `monthly` | `year`, `month` | type, activityId, personId, q |
 | `individual` | `year`, `month` | **personId (required)** |
-| `department` | `year`, `month` | departmentId |
 | `activity` | `year`, `month` | activityId |
-| `absence`, `late`, `early`, `incomplete` | `from`, `to` (default: current month to today; max 1 year) | type, departmentId, activityId, personId |
-| `leave` | `from`, `to` (may extend into the future) | status, type, departmentId, activityId, personId |
+| `absence`, `late`, `early`, `incomplete` | `from`, `to` (default: current month to today; max 1 year) | type, activityId, personId |
+| `leave` | `from`, `to` (may extend into the future) | status, type, activityId, personId |
 
 JSON response: `{type, title, period, filters[], columns[], rows[], summary[], notes[], meta{university, unit, generatedAt, generatedBy, timezone, footer}}`. File exports need `reports.export` and are audited (`REPORT_EXPORT`).
 

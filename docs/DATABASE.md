@@ -6,11 +6,10 @@ PostgreSQL 16. The schema lives in `database/migrations/*.sql` and is applied by
 
 | Table | Purpose |
 |---|---|
-| `departments` | Academic / administrative departments (`code` unique) |
-| `activities` | Sports / activities, optionally owned by a department |
+| `activities` | Sports / activities; every person belongs to one |
 | `people` | Guest Faculty and Sports Coach profiles (soft-deletable via `deleted_at`; deactivated via `status`) |
 | `users` | Login accounts; `role`, lockout counters, optional link to a `people` row |
-| `user_scopes` | Coordinator scope: one row per department or activity |
+| `user_scopes` | Coordinator scope: one row per sport / activity |
 | `sessions` | Server-side sessions (SHA-256 token hash, CSRF token, expiry, revocation) |
 | `password_reset_tokens` | Single-use, hashed, expiring reset tokens |
 | `attendance` | One row per person per date: status, check-in/out instants, duration, method, remarks, marker, version |
@@ -26,11 +25,11 @@ PostgreSQL 16. The schema lives in `database/migrations/*.sql` and is applied by
 ## Entity relationships
 
 ```
-departments 1─* people *─1 activities *─0..1 departments
+people *─1 activities
 people 1─* attendance *─0..1 leaves
 people 1─* leaves
 people 1─0..1 users 1─* sessions
-users 1─* user_scopes (department | activity)
+users 1─* user_scopes (activity)
 people 1─* attendance_corrections *─0..1 attendance
 users 1─* audit_logs
 ```
@@ -47,9 +46,9 @@ users 1─* audit_logs
 | Leave link only on LEAVE status | `attendance_leave_link_ck` |
 | No overlapping pending/approved leave for a person | `leaves_no_overlap EXCLUDE USING gist (person_id =, daterange &&) WHERE status IN (PENDING, APPROVED)` |
 | Leave date range valid | `leaves_range_ck` |
-| Guest Faculty have a department; coaches have an activity | `people_gf_dept_ck`, `people_sc_activity_ck` |
+| Every person has a sport / activity (since migration 0003) | `people_activity_ck` |
 | Contract end ≥ start | `people_contract_ck` |
-| Unique reference ID / email / department code / activity name | unique constraints |
+| Unique reference ID / email / activity name | unique constraints |
 | Staff login must link to a profile | `users_staff_person_ck` |
 | One pending correction per person-date | partial unique index |
 | **Audit log is append-only** | `audit_logs_no_update` trigger raises on UPDATE/DELETE |
@@ -62,7 +61,7 @@ Inactive people are excluded from active lists by `status = 'ACTIVE'` filters. T
 
 - `attendance (date, status)`: daily sheets and dashboards
 - `attendance (date) WHERE check_in_at IS NOT NULL AND check_out_at IS NULL`: live and incomplete views
-- `people (type, status) WHERE deleted_at IS NULL`, `people (department_id)`, `people (activity_id)`, `people (lower(full_name))`
+- `people (type, status) WHERE deleted_at IS NULL`, `people (activity_id)`, `people (lower(full_name))`
 - `leaves (status, submitted_at DESC)`, `leaves (person_id, from_date)`
 - `audit_logs (created_at DESC)`, `(entity_type, entity_id)`, `(user_id, created_at DESC)`, `(action)`
 - `notifications (user_id, created_at DESC)`, `attendance_corrections (person_id, date DESC)`

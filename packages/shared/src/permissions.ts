@@ -36,7 +36,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'attendance.self': 'Check in / check out (self)',
   'people.read': 'View Guest Faculty / Coaches',
   'people.write': 'Create / edit / deactivate Guest Faculty / Coaches',
-  'org.manage': 'Manage departments and sports/activities',
+  'org.manage': 'Manage sports / activities',
   'leave.review': 'Approve / reject leave',
   'leave.self': 'Submit own leave requests',
   'reports.generate': 'Generate reports',
@@ -77,7 +77,7 @@ export function can(role: Role | undefined | null, permission: Permission): bool
   return ROLE_PERMISSIONS[role].includes(permission);
 }
 
-/** Roles whose data visibility is limited to assigned departments/activities. */
+/** Roles whose data visibility is limited to assigned sports/activities. */
 export function isScopedRole(role: Role): boolean {
   return role === 'COORDINATOR';
 }

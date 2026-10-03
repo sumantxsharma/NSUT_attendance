@@ -27,13 +27,13 @@ test.describe.serial('attendance lifecycle', () => {
 
   test('1–2. admin signs in and creates a Guest Faculty profile with a login', async ({ page }) => {
     await signIn(page, ADMIN.email, ADMIN.password);
-    await expect(page.getByRole('heading', { name: /Attendance Overview/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
     await expect(page.getByText('Total personnel')).toBeVisible();
 
     await page.goto('/people/new?type=GUEST_FACULTY');
     await page.getByLabel('Employee / Reference ID').fill(REF);
     await page.getByLabel('Full name').fill(NAME);
-    await page.getByLabel('Department').selectOption({ label: 'Mechanical Engineering' });
+    await page.getByLabel('Sport / Activity').selectOption({ label: 'Swimming' });
     await page.getByLabel('Specialization').fill('Heat Transfer');
     await page.getByLabel('Email').fill(EMAIL);
     await page.getByLabel('Initial password').fill(PASSWORD);
@@ -120,7 +120,7 @@ test.describe('access control and responsive layout', () => {
     await expect(page.getByRole('heading', { name: 'My Attendance' })).toBeVisible();
     await page.goto('/admin/users');
     await expect(page.getByText('You do not have permission to view this page.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Audit Logs' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Administration' })).toHaveCount(0);
   });
 
   test('unauthenticated users are redirected to sign in', async ({ page }) => {
@@ -131,10 +131,10 @@ test.describe('access control and responsive layout', () => {
   test('mobile: navigation becomes a drawer and tables become cards', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await signIn(page, 'officer@demo.invalid', 'Demo@12345');
-    await expect(page.getByRole('heading', { name: /Attendance Overview/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeHidden();
     await page.getByRole('button', { name: 'Open navigation' }).click();
-    await page.getByRole('dialog', { name: 'Navigation' }).getByRole('link', { name: "Today's Attendance" }).click();
+    await page.getByRole('dialog', { name: 'Navigation' }).getByRole('link', { name: 'Attendance', exact: true }).click();
     await expect(page.getByRole('heading', { name: "Today's Attendance" })).toBeVisible();
     await expect(page.locator('table')).toBeHidden();
     await expect(page.locator('ul li dl').first()).toBeVisible();

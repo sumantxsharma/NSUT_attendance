@@ -18,8 +18,7 @@ RUN npm run build -w @nsut/web && npm run build -w @nsut/api
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production \
     APP_ROOT=/app \
-    PORT=4000 \
-    UPLOAD_DIR=/app/uploads
+    PORT=4000
 WORKDIR /app
 RUN apk add --no-cache tini postgresql16-client
 COPY package.json package-lock.json ./
@@ -32,7 +31,7 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/web/dist ./apps/web/dist
 COPY database ./database
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh && mkdir -p /app/uploads && chown -R node:node /app/uploads
+RUN chmod +x /usr/local/bin/entrypoint.sh
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- http://127.0.0.1:4000/health || exit 1

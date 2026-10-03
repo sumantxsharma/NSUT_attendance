@@ -1,14 +1,13 @@
-import fs from 'node:fs';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { activitySchema, createPersonSchema, departmentSchema, personSchema, PERSON_TYPES, RECORD_STATUSES, uuid } from '@nsut/shared';
+import { activitySchema, createPersonSchema, personSchema, PERSON_TYPES, RECORD_STATUSES, uuid } from '@nsut/shared';
 import { one, query, tx } from '../db/pool';
 import { audit } from '../lib/audit';
 import { ah, badRequest, notFound } from '../lib/errors';
 import { assertPersonVisible, peopleScopeSql } from '../lib/scope';
 import { likePattern, Params } from '../lib/sql';
-import { MIME_BY_EXT, memoryUpload, resolveUpload, saveValidatedFile } from '../lib/upload';
+import { memoryUpload, saveValidatedFile, sendStoredFile } from '../lib/upload';
 import { requirePerm } from '../middleware/auth';
 import { PERSON_JOINS, PERSON_SELECT, serializePerson, type PersonLite } from '../services/attendance';
 import { BCRYPT_ROUNDS } from './auth';
@@ -18,7 +17,6 @@ export const peopleRouter = Router();
 const listQuery = z.object({
   q: z.string().trim().max(100).optional(),
   type: z.enum(PERSON_TYPES).optional(),
-  departmentId: uuid.optional(),
   activityId: uuid.optional(),
   status: z.enum([...RECORD_STATUSES, 'ALL'] as const).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional().default(1),
@@ -34,12 +32,11 @@ peopleRouter.get(
     const p = new Params();
     const where = ['p.deleted_at IS NULL', peopleScopeSql(req, p)];
     if (f.type) where.push(`p.type = ${p.add(f.type)}`);
-    if (f.departmentId) where.push(`p.department_id = ${p.add(f.departmentId)}`);
     if (f.activityId) where.push(`p.activity_id = ${p.add(f.activityId)}`);
     if (f.status !== 'ALL') where.push(`p.status = ${p.add(f.status ?? 'ACTIVE')}`);
     if (f.q) {
       const q = p.add(likePattern(f.q));
-      where.push(`(p.full_name ILIKE ${q} OR p.ref_id ILIKE ${q} OR d.name ILIKE ${q} OR d.code ILIKE ${q} OR a.name ILIKE ${q} OR p.designation ILIKE ${q} OR p.specialization ILIKE ${q})`);
+      where.push(`(p.full_name ILIKE ${q} OR p.ref_id ILIKE ${q} OR a.name ILIKE ${q} OR p.designation ILIKE ${q} OR p.specialization ILIKE ${q})`);
     }
     const order = { name: 'p.full_name', refId: 'p.ref_id', joining: 'p.joining_date DESC NULLS LAST', contractEnd: 'p.contract_end NULLS LAST' }[f.sort];
     const total = await one<{ n: number }>(`SELECT count(*)::int AS n FROM people p ${PERSON_JOINS} WHERE ${where.join(' AND ')}`, p.values);
@@ -79,8 +76,7 @@ function personValues(b: z.infer<typeof personSchema>) {
     b.refId,
     b.fullName,
     b.type,
-    b.type === 'GUEST_FACULTY' ? b.departmentId : (b.departmentId ?? null),
-    b.type === 'SPORTS_COACH' ? b.activityId : (b.activityId ?? null),
+    b.activityId,
     b.designation ?? null,
     b.specialization ?? null,
     b.email ?? null,
@@ -101,8 +97,8 @@ peopleRouter.post(
     if (b.createLogin && !b.initialPassword) throw badRequest('An initial password is required to create a login account.');
     const out = await tx(async (c) => {
       const row = await one(
-        `INSERT INTO people (ref_id, full_name, type, department_id, activity_id, designation, specialization, email, phone, joining_date, contract_start, contract_end, assigned_hours)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        `INSERT INTO people (ref_id, full_name, type, activity_id, designation, specialization, email, phone, joining_date, contract_start, contract_end, assigned_hours)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
         personValues(b),
         c,
       );
@@ -130,8 +126,8 @@ peopleRouter.patch(
       const before = await one('SELECT * FROM people WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id], c);
       if (!before) throw notFound('Person');
       const after = await one(
-        `UPDATE people SET ref_id=$1, full_name=$2, type=$3, department_id=$4, activity_id=$5, designation=$6, specialization=$7, email=$8, phone=$9,
-           joining_date=$10, contract_start=$11, contract_end=$12, assigned_hours=$13 WHERE id=$14 RETURNING *`,
+        `UPDATE people SET ref_id=$1, full_name=$2, type=$3, activity_id=$4, designation=$5, specialization=$6, email=$7, phone=$8,
+           joining_date=$9, contract_start=$10, contract_end=$11, assigned_hours=$12 WHERE id=$13 RETURNING *`,
         [...personValues(b), id],
         c,
       );
@@ -185,12 +181,13 @@ peopleRouter.post(
   memoryUpload(2).single('photo'),
   ah(async (req, res) => {
     const id = uuid.parse(req.params.id);
-    const saved = saveValidatedFile(req.file, ['image/png', 'image/jpeg'], 'photos');
-    if (!saved) throw badRequest('Choose a photo to upload.');
+    if (!req.file) throw badRequest('Choose a photo to upload.');
     const before = await one('SELECT photo_path, full_name FROM people WHERE id = $1', [id]);
     if (!before) throw notFound('Person');
     await tx(async (c) => {
+      const saved = (await saveValidatedFile(req.file, ['image/png', 'image/jpeg'], 'photos', c))!;
       await c.query('UPDATE people SET photo_path = $2 WHERE id = $1', [id, saved.path]);
+      if (before.photo_path) await c.query('DELETE FROM stored_files WHERE key = $1', [before.photo_path]);
       await audit({ action: 'PERSON_UPDATE', entityType: 'person', entityId: id, summary: `Updated photograph of ${before.full_name}`, oldValue: { photo: before.photo_path }, newValue: { photo: saved.path } }, req, c);
     });
     res.json({ ok: true });
@@ -205,61 +202,12 @@ peopleRouter.get(
     await assertPersonVisible(req, id);
     const row = await one<{ photo_path: string | null }>('SELECT photo_path FROM people WHERE id = $1', [id]);
     if (!row?.photo_path) throw notFound('Photo');
-    const full = resolveUpload(row.photo_path);
-    if (!fs.existsSync(full)) throw notFound('Photo');
-    res.setHeader('Content-Type', MIME_BY_EXT[full.split('.').pop()!] ?? 'application/octet-stream');
-    res.setHeader('Cache-Control', 'private, max-age=300');
-    fs.createReadStream(full).pipe(res);
+    await sendStoredFile(res, row.photo_path, 'Photo', { 'Cache-Control': 'private, max-age=300' });
   }),
 );
 
-// ------------------------------------------------------------------ departments & activities
+// ------------------------------------------------------------------ sports & activities
 export const orgRouter = Router();
-
-orgRouter.get(
-  '/departments',
-  ah(async (req, res) => {
-    const all = req.query.all === 'true';
-    res.json(
-      await query(
-        `SELECT d.id, d.name, d.code, d.status,
-          (SELECT count(*)::int FROM people p WHERE p.department_id = d.id AND p.status = 'ACTIVE' AND p.deleted_at IS NULL) AS "activePeople"
-         FROM departments d ${all ? '' : "WHERE d.status = 'ACTIVE'"} ORDER BY d.name`,
-      ),
-    );
-  }),
-);
-
-orgRouter.post(
-  '/departments',
-  requirePerm('org.manage'),
-  ah(async (req, res) => {
-    const b = departmentSchema.parse(req.body);
-    const row = await tx(async (c) => {
-      const r = await one('INSERT INTO departments (name, code, status) VALUES ($1,$2,$3) RETURNING *', [b.name, b.code, b.status ?? 'ACTIVE'], c);
-      await audit({ action: 'DEPARTMENT_CREATE', entityType: 'department', entityId: r.id, summary: `Created department ${b.name}`, newValue: r }, req, c);
-      return r;
-    });
-    res.status(201).json(row);
-  }),
-);
-
-orgRouter.patch(
-  '/departments/:id',
-  requirePerm('org.manage'),
-  ah(async (req, res) => {
-    const id = uuid.parse(req.params.id);
-    const b = departmentSchema.parse(req.body);
-    const row = await tx(async (c) => {
-      const before = await one('SELECT * FROM departments WHERE id = $1 FOR UPDATE', [id], c);
-      if (!before) throw notFound('Department');
-      const r = await one('UPDATE departments SET name=$2, code=$3, status=$4 WHERE id=$1 RETURNING *', [id, b.name, b.code, b.status ?? before.status], c);
-      await audit({ action: 'DEPARTMENT_UPDATE', entityType: 'department', entityId: id, summary: `Updated department ${b.name}`, oldValue: before, newValue: r }, req, c);
-      return r;
-    });
-    res.json(row);
-  }),
-);
 
 orgRouter.get(
   '/activities',
@@ -267,9 +215,9 @@ orgRouter.get(
     const all = req.query.all === 'true';
     res.json(
       await query(
-        `SELECT a.id, a.name, a.category, a.status, a.department_id AS "departmentId", d.name AS "departmentName",
+        `SELECT a.id, a.name, a.category, a.status,
           (SELECT count(*)::int FROM people p WHERE p.activity_id = a.id AND p.status = 'ACTIVE' AND p.deleted_at IS NULL) AS "activePeople"
-         FROM activities a LEFT JOIN departments d ON d.id = a.department_id ${all ? '' : "WHERE a.status = 'ACTIVE'"} ORDER BY a.category, a.name`,
+         FROM activities a ${all ? '' : "WHERE a.status = 'ACTIVE'"} ORDER BY a.category, a.name`,
       ),
     );
   }),
@@ -281,7 +229,7 @@ orgRouter.post(
   ah(async (req, res) => {
     const b = activitySchema.parse(req.body);
     const row = await tx(async (c) => {
-      const r = await one('INSERT INTO activities (name, category, department_id, status) VALUES ($1,$2,$3,$4) RETURNING *', [b.name, b.category, b.departmentId ?? null, b.status ?? 'ACTIVE'], c);
+      const r = await one('INSERT INTO activities (name, category, status) VALUES ($1,$2,$3) RETURNING *', [b.name, b.category, b.status ?? 'ACTIVE'], c);
       await audit({ action: 'ACTIVITY_CREATE', entityType: 'activity', entityId: r.id, summary: `Created activity ${b.name}`, newValue: r }, req, c);
       return r;
     });
@@ -298,7 +246,7 @@ orgRouter.patch(
     const row = await tx(async (c) => {
       const before = await one('SELECT * FROM activities WHERE id = $1 FOR UPDATE', [id], c);
       if (!before) throw notFound('Activity');
-      const r = await one('UPDATE activities SET name=$2, category=$3, department_id=$4, status=$5 WHERE id=$1 RETURNING *', [id, b.name, b.category, b.departmentId ?? null, b.status ?? before.status], c);
+      const r = await one('UPDATE activities SET name=$2, category=$3, status=$4 WHERE id=$1 RETURNING *', [id, b.name, b.category, b.status ?? before.status], c);
       await audit({ action: 'ACTIVITY_UPDATE', entityType: 'activity', entityId: id, summary: `Updated activity ${b.name}`, oldValue: before, newValue: r }, req, c);
       return r;
     });

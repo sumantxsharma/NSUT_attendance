@@ -2,12 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 import { ATTENDANCE_STATUS_LABELS, PERSON_TYPE_LABELS, type PersonType } from '@nsut/shared';
 import { api } from '../lib/api';
-import type { Activity, Department, Person } from '../lib/types';
+import type { Activity, Person } from '../lib/types';
 
 export function useOrg() {
-  const departments = useQuery({ queryKey: ['departments'], queryFn: () => api.get<Department[]>('/departments'), staleTime: 60_000 });
   const activities = useQuery({ queryKey: ['activities'], queryFn: () => api.get<Activity[]>('/activities'), staleTime: 60_000 });
-  return { departments: departments.data ?? [], activities: activities.data ?? [] };
+  return { activities: activities.data ?? [] };
 }
 
 export function usePeopleOptions(type?: PersonType) {
@@ -20,7 +19,6 @@ export function usePeopleOptions(type?: PersonType) {
 
 export interface FilterValues {
   type?: PersonType | '';
-  departmentId?: string;
   activityId?: string;
   status?: string;
   personId?: string;
@@ -31,17 +29,17 @@ export interface FilterValues {
 export function FilterBar({
   value,
   onChange,
-  show = ['type', 'department', 'activity'],
+  show = ['type', 'activity'],
   statusOptions,
   children,
 }: {
   value: FilterValues;
   onChange: (v: FilterValues) => void;
-  show?: ('q' | 'type' | 'department' | 'activity' | 'status' | 'person')[];
+  show?: ('q' | 'type' | 'activity' | 'status' | 'person')[];
   statusOptions?: { value: string; label: string }[];
   children?: React.ReactNode;
 }) {
-  const { departments, activities } = useOrg();
+  const { activities } = useOrg();
   const people = usePeopleOptions(value.type || undefined);
   const set = (patch: Partial<FilterValues>) => onChange({ ...value, ...patch });
   const active = Object.entries(value).filter(([, v]) => v).length;
@@ -67,22 +65,7 @@ export function FilterBar({
           </select>
         </label>
       )}
-      {show.includes('department') && value.type !== 'SPORTS_COACH' && (
-        <label>
-          <span className="sr-only">Department</span>
-          <select className="input w-auto max-w-[240px]" value={value.departmentId ?? ''} onChange={(e) => set({ departmentId: e.target.value })}>
-            <option value="">All departments</option>
-            {departments
-              .filter((d) => d.code !== 'SPORTS')
-              .map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-          </select>
-        </label>
-      )}
-      {show.includes('activity') && value.type !== 'GUEST_FACULTY' && (
+      {show.includes('activity') && (
         <label>
           <span className="sr-only">Sport / activity</span>
           <select className="input w-auto" value={value.activityId ?? ''} onChange={(e) => set({ activityId: e.target.value })}>

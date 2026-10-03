@@ -37,7 +37,7 @@ interface UserRow {
   personName: string | null;
   lastLogin: string | null;
   locked: boolean;
-  scopes: { departmentId: string | null; departmentName: string | null; activityId: string | null; activityName: string | null }[];
+  scopes: { activityId: string; activityName: string }[];
 }
 
 export function UsersPage() {
@@ -47,7 +47,7 @@ export function UsersPage() {
   const toast = useToast();
   const [f, setF] = useUrlState<{ q?: string; role?: string; status?: string }>({});
   const q = useQuery({ queryKey: ['users', f], queryFn: () => api.get<UserRow[]>('/users', f) });
-  const [edit, setEdit] = useState<Partial<UserRow> & { password?: string; scopeDepartmentIds?: string[]; scopeActivityIds?: string[] } | null>(null);
+  const [edit, setEdit] = useState<Partial<UserRow> & { password?: string; scopeActivityIds?: string[] } | null>(null);
   const [resetLink, setResetLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const act = useMutation({
@@ -66,7 +66,7 @@ export function UsersPage() {
         title="Users"
         subtitle="Accounts, roles and coordinator scope. Staff logins can also be created from a person’s profile."
         actions={
-          <Button variant="primary" onClick={() => setEdit({ role: 'OFFICER', name: '', email: '', password: '', scopeDepartmentIds: [], scopeActivityIds: [] })}>
+          <Button variant="primary" onClick={() => setEdit({ role: 'OFFICER', name: '', email: '', password: '', scopeActivityIds: [] })}>
             <Plus className="h-4 w-4" /> Add user
           </Button>
         }
@@ -119,7 +119,7 @@ export function UsersPage() {
                   u.role === 'STAFF' ? (
                     u.personId ? <Link to={`/people/${u.personId}`}>{u.personName}</Link> : '—'
                   ) : u.role === 'COORDINATOR' ? (
-                    <span className="text-xs">{u.scopes.map((s) => s.departmentName ?? s.activityName).join(', ')}</span>
+                    <span className="text-xs">{u.scopes.map((s) => s.activityName).join(', ')}</span>
                   ) : (
                     <span className="text-xs text-muted">All</span>
                   ),
@@ -131,7 +131,7 @@ export function UsersPage() {
                 align: 'right',
                 cell: (u) => (
                   <div className="flex flex-wrap justify-end gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => setEdit({ ...u, scopeDepartmentIds: u.scopes.map((s) => s.departmentId!).filter(Boolean), scopeActivityIds: u.scopes.map((s) => s.activityId!).filter(Boolean) })}>
+                    <Button size="sm" variant="ghost" onClick={() => setEdit({ ...u, scopeActivityIds: u.scopes.map((s) => s.activityId) })}>
                       Edit
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => act.mutate({ id: u.id, action: 'reset-link' })} title="Issue a password reset link">
@@ -187,7 +187,7 @@ export function UsersPage() {
 function UserDialog({ value, onClose }: { value: any | null; onClose: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const { departments, activities } = useOrg();
+  const { activities } = useOrg();
   const people = usePeopleOptions();
   const [u, setU] = useState<any>(null);
   useEffect(() => {
@@ -197,7 +197,7 @@ function UserDialog({ value, onClose }: { value: any | null; onClose: () => void
   }, [value]);
   const m = useMutation({
     mutationFn: () => {
-      const body = { name: u.name, phone: u.phone || null, role: u.role, personId: u.role === 'STAFF' ? u.personId || null : null, scopeDepartmentIds: u.scopeDepartmentIds ?? [], scopeActivityIds: u.scopeActivityIds ?? [] };
+      const body = { name: u.name, phone: u.phone || null, role: u.role, personId: u.role === 'STAFF' ? u.personId || null : null, scopeActivityIds: u.scopeActivityIds ?? [] };
       return u.id ? api.patch(`/users/${u.id}`, body) : api.post('/users', { ...body, email: u.email, password: u.password });
     },
     onSuccess: () => {
@@ -208,7 +208,7 @@ function UserDialog({ value, onClose }: { value: any | null; onClose: () => void
   });
   if (!u) return null;
   const fe = fieldErrors(m.error);
-  const toggle = (key: 'scopeDepartmentIds' | 'scopeActivityIds', id: string) => setU({ ...u, [key]: (u[key] ?? []).includes(id) ? u[key].filter((x: string) => x !== id) : [...(u[key] ?? []), id] });
+  const toggle = (key: 'scopeActivityIds', id: string) => setU({ ...u, [key]: (u[key] ?? []).includes(id) ? u[key].filter((x: string) => x !== id) : [...(u[key] ?? []), id] });
   return (
     <Modal
       open={!!value}
@@ -266,24 +266,13 @@ function UserDialog({ value, onClose }: { value: any | null; onClose: () => void
         )}
         {u.role === 'COORDINATOR' && (
           <fieldset className="sm:col-span-2">
-            <legend className="label">Scope — this coordinator can see only these departments / activities</legend>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded border border-line p-3">
-                <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted">Departments</p>
-                {departments.map((d) => (
-                  <label key={d.id} className="flex items-center gap-2 py-0.5 text-sm">
-                    <input type="checkbox" checked={(u.scopeDepartmentIds ?? []).includes(d.id)} onChange={() => toggle('scopeDepartmentIds', d.id)} /> {d.name}
-                  </label>
-                ))}
-              </div>
-              <div className="rounded border border-line p-3">
-                <p className="mb-2 text-2xs font-semibold uppercase tracking-wide text-muted">Sports / activities</p>
-                {activities.map((a) => (
-                  <label key={a.id} className="flex items-center gap-2 py-0.5 text-sm">
-                    <input type="checkbox" checked={(u.scopeActivityIds ?? []).includes(a.id)} onChange={() => toggle('scopeActivityIds', a.id)} /> {a.name}
-                  </label>
-                ))}
-              </div>
+            <legend className="label">Scope — this coordinator can see only these sports / activities</legend>
+            <div className="grid gap-x-4 rounded border border-line p-3 sm:grid-cols-3">
+              {activities.map((a) => (
+                <label key={a.id} className="flex items-center gap-2 py-0.5 text-sm">
+                  <input type="checkbox" checked={(u.scopeActivityIds ?? []).includes(a.id)} onChange={() => toggle('scopeActivityIds', a.id)} /> {a.name}
+                </label>
+              ))}
             </div>
           </fieldset>
         )}
@@ -300,7 +289,7 @@ export function RolesPage() {
   const q = useQuery({ queryKey: ['roles'], queryFn: () => api.get<{ roles: { role: Role; label: string; permissions: string[] }[]; permissions: { key: string; label: string }[] }>('/roles') });
   return (
     <div>
-      <PageHeader eyebrow="Administration" title="Roles & Permissions" subtitle="Permissions are enforced by the server on every request. Coordinators additionally see only their assigned departments / activities." />
+      <PageHeader eyebrow="Administration" title="Roles & Permissions" subtitle="Permissions are enforced by the server on every request. Coordinators additionally see only their assigned sports / activities." />
       <PanelBox>
         {!q.data ? (
           <TableSkeleton rows={10} cols={5} />
@@ -709,7 +698,7 @@ export function AuditPage() {
           </select>
           <select className="input w-auto" value={f.entityType ?? ''} onChange={(e) => setF({ entityType: e.target.value, page: undefined })} aria-label="Record type">
             <option value="">All records</option>
-            {['attendance', 'leave', 'person', 'user', 'settings', 'department', 'activity', 'holiday', 'report'].map((t) => (
+            {['attendance', 'leave', 'person', 'user', 'settings', 'activity', 'holiday', 'report'].map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
@@ -831,7 +820,7 @@ export function ProfilePage() {
           {me.scopes.length > 0 && (
             <div className="sm:col-span-2">
               <dt className="text-2xs uppercase tracking-wide text-muted">Assigned scope</dt>
-              <dd>{me.scopes.map((s) => s.departmentName ?? s.activityName).join(', ')}</dd>
+              <dd>{me.scopes.map((s) => s.activityName).join(', ')}</dd>
             </div>
           )}
         </dl>

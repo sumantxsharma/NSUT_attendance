@@ -44,7 +44,7 @@ Then sign in, and work through these in order:
 
 1. *System Settings*: university name, unit, logo, holidays.
 2. *Attendance Rules*: confirm actual timings and policies with the Establishment Section.
-3. Departments and sports.
+3. Sports and activities.
 4. People.
 5. Users.
 
@@ -79,11 +79,7 @@ Schedule it daily with cron (as `nsutapp`):
 
 - `BACKUP_HOST_DIR` must be on different storage from the Docker volume holding `pgdata`: a separate disk, NFS or the University backup server.
 - Replicate backups off-site weekly, for example with rsync to a second campus server.
-- Back up the `uploads` volume too (photos, leave documents, logo):
-
-  ```bash
-  docker run --rm -v nsut-attendance_uploads:/u -v /mnt/backup/nsut-attendance:/b alpine tar czf /b/uploads-$(date +%F).tgz -C /u .
-  ```
+- Uploaded files (photos, leave documents, logo) are stored in the database (`stored_files`), so the dump covers them.
 
 **Suggested retention:** 30 daily, 12 monthly (keep the 1st-of-month dump), 5 yearly. Align this with the University records policy.
 
@@ -98,7 +94,7 @@ sha256sum -c /mnt/backup/nsut-attendance/nsut_attendance-YYYYMMDD-HHMMSS.dump.sh
 docker compose exec -T db dropdb -U nsut nsut_attendance
 docker compose exec -T db createdb -U nsut nsut_attendance
 docker compose exec -T db pg_restore -U nsut -d nsut_attendance --no-owner < /mnt/backup/nsut-attendance/nsut_attendance-YYYYMMDD-HHMMSS.dump
-# 4. restore uploads if needed, then start the app (pending migrations apply automatically)
+# 4. start the app (pending migrations apply automatically)
 docker compose start app && curl -s http://localhost:4000/health
 ```
 
@@ -111,7 +107,7 @@ docker compose start app && curl -s http://localhost:4000/health
 | App container crash | Docker restarts it (`restart: unless-stopped`); health check marks it unhealthy | 0 / minutes |
 | Bad deployment | `git checkout <previous tag> && docker compose up -d --build` (migrations are forward-only; restore a backup if a migration must be undone) | 0 / < 30 min |
 | Database corruption / accidental deletion | Restore the latest daily dump (above) | ≤ 24 h / < 1 h |
-| Server loss | Provision a new VM, install as in step 1, restore the latest off-site dump and uploads | ≤ 24 h / < 4 h |
+| Server loss | Provision a new VM, install as in step 1, restore the latest off-site dump | ≤ 24 h / < 4 h |
 
 For a tighter RPO, enable PostgreSQL WAL archiving (`archive_mode=on`, for example with pgBackRest) to the backup storage for point-in-time recovery.
 
@@ -151,13 +147,39 @@ No particular provider is assumed. The same architecture maps onto any provider 
 |---|---|
 | App container | Any container service or a VM running Docker (build the image from this repo; push to the provider's private registry) |
 | PostgreSQL | Managed PostgreSQL 14+ with `btree_gist`, `citext` and `pgcrypto` enabled (all are standard extensions); private networking only |
-| Uploads | Persistent volume mounted at `UPLOAD_DIR`. Object storage needs a small adapter in `lib/upload.ts`, because V1 writes to disk |
+| Uploads | Nothing extra: files are stored in PostgreSQL (`stored_files`), so app instances are stateless |
 | HTTPS | Provider load balancer with the University certificate; set `COOKIE_SECURE=true`, `TRUST_PROXY=1` |
 | Backups | Managed automated backups + point-in-time recovery, **plus** a periodic `pg_dump` exported to storage outside the provider account |
 | Secrets | Provider secret manager injecting `DATABASE_URL` and `SESSION_SECRET` |
 | Monitoring | Provider health checks on `/health`; forward container logs to the provider log service |
 
 **Data residency.** Attendance data is personal data. Confirm the region, the University's data-protection obligations and contractual terms before choosing a provider.
+
+## Option C: Vercel + managed PostgreSQL
+
+The app runs on Vercel without code changes: the React app is served from Vercel's CDN and the Express API runs as one Node.js serverless function. `vercel.json` points the build at `scripts/vercel-build.mjs`, which writes the [Build Output API](https://vercel.com/docs/build-output-api/v3) layout to `.vercel/output`.
+
+1. Create a PostgreSQL 14+ database (Neon, Supabase or any managed provider; Vercel Marketplace → Neon is the shortest path). Use the **pooled** connection string with `sslmode=require`.
+2. Import the repository in Vercel. Leave *Framework Preset* as **Other**; the build and install commands come from `vercel.json`.
+3. Set environment variables (Production, and Preview pointing at a **separate** database):
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | pooled connection string |
+   | `SESSION_SECRET` | long random string |
+   | `APP_BASE_URL` | `https://<your-domain>` (used in password-reset links) |
+   | `DEMO_MODE` | `true` only for a demo instance |
+   | `DB_POOL_MAX` | optional; defaults to 3 per function instance on Vercel |
+
+4. Deploy. The build applies pending migrations when `DATABASE_URL` is set (`MIGRATE_ON_BUILD=false` turns this off).
+5. Create the first Super Admin from your machine against the same database: `DATABASE_URL=<url> npm run create-admin -w @nsut/api`. For a demo instance, load demo data instead: `DATABASE_URL=<url> npm run db:seed`.
+
+Notes:
+
+- `NODE_ENV=production` on Vercel turns on secure cookies and HSTS; `TRUST_PROXY` defaults to `1`, which matches Vercel's proxy.
+- The login rate limiter is per function instance, so the limit is approximate under load. Account lockout is stored in the database and is exact.
+- Exports (PDF/XLSX) are generated inside the function; the 30 s `maxDuration` is well above what the largest monthly report needs.
+- Logs go to Vercel's runtime logs (structured JSON).
 
 ## Pre-go-live checklist
 

@@ -9,7 +9,7 @@ import { api } from '../lib/api';
 import { useAuth, useTz } from '../lib/auth';
 import { monthLabel, nowParts, unitName } from '../lib/format';
 import { useUrlState } from '../lib/hooks';
-import type { Activity, Department, Leave, Person, PersonMonth } from '../lib/types';
+import type { Activity, Leave, Person, PersonMonth } from '../lib/types';
 import { AttendanceCalendar, SummaryStrip } from '../components/AttendanceCalendar';
 import { ManualMarkDialog } from '../components/AttendanceDialogs';
 import { FilterBar, MonthPicker, useOrg, type FilterValues } from '../components/Filters';
@@ -23,11 +23,11 @@ import { LeaveStatusBadge } from './LeavePage';
 export function PeopleListPage({ type }: { type: PersonType }) {
   const { can } = useAuth();
   const nav = useNavigate();
-  const [f, setF] = useUrlState<{ q?: string; departmentId?: string; activityId?: string; status?: string; page?: string }>({});
+  const [f, setF] = useUrlState<{ q?: string; activityId?: string; status?: string; page?: string }>({});
   const page = Number(f.page ?? 1);
   const q = useQuery({
     queryKey: ['people', type, f],
-    queryFn: () => api.get<{ total: number; page: number; pageSize: number; rows: Person[] }>('/people', { type, q: f.q, departmentId: f.departmentId, activityId: f.activityId, status: f.status ?? 'ACTIVE', page, pageSize: 25 }),
+    queryFn: () => api.get<{ total: number; page: number; pageSize: number; rows: Person[] }>('/people', { type, q: f.q, activityId: f.activityId, status: f.status ?? 'ACTIVE', page, pageSize: 25 }),
     placeholderData: (prev) => prev,
   });
   const isGF = type === 'GUEST_FACULTY';
@@ -47,7 +47,7 @@ export function PeopleListPage({ type }: { type: PersonType }) {
       />
       <PanelBox>
         <div className="border-b border-line px-4 py-3">
-          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...(v as any), status: f.status, page: undefined }, true)} show={isGF ? ['q', 'department'] : ['q', 'activity']}>
+          <FilterBar value={f as FilterValues} onChange={(v) => setF({ ...(v as any), status: f.status, page: undefined }, true)} show={['q', 'activity']}>
             <label>
               <span className="sr-only">Record status</span>
               <select className="input w-auto" value={f.status ?? 'ACTIVE'} onChange={(e) => setF({ status: e.target.value === 'ACTIVE' ? undefined : e.target.value, page: undefined })}>
@@ -95,7 +95,7 @@ export function PeopleListPage({ type }: { type: PersonType }) {
                   ),
                 },
                 { key: 'ref', header: 'Ref. ID', sortValue: (p) => p.refId, cell: (p) => <span className="font-mono text-xs">{p.refId}</span> },
-                { key: 'unit', header: isGF ? 'Department' : 'Sport / Activity', sortValue: (p) => unitName(p), cell: (p) => unitName(p) },
+                { key: 'unit', header: 'Sport / Activity', sortValue: (p) => unitName(p), cell: (p) => unitName(p) },
                 { key: 'spec', header: 'Specialization', cell: (p) => <span className="text-[13px] text-muted">{p.specialization ?? '—'}</span> },
                 { key: 'contract', header: 'Contract ends', sortValue: (p) => p.contractEnd, cell: (p) => <ContractEnd date={p.contractEnd} /> },
                 { key: 'hours', header: 'Assigned hrs/wk', align: 'right', cell: (p) => p.assignedHours ?? '—' },
@@ -196,7 +196,6 @@ export function PersonProfilePage() {
             </p>
             <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
               <Info k="Employee / Ref. ID" v={<span className="font-mono">{p.refId}</span>} />
-              <Info k="Department" v={p.departmentName ?? '—'} />
               <Info k="Sport / Activity" v={p.activityName ?? '—'} />
               <Info k="Joining date" v={p.joiningDate ? DateTime.fromISO(p.joiningDate).toFormat('dd MMM yyyy') : '—'} />
               <Info k="Contract period" v={p.contractStart ? `${DateTime.fromISO(p.contractStart).toFormat('dd MMM yyyy')} – ${p.contractEnd ? DateTime.fromISO(p.contractEnd).toFormat('dd MMM yyyy') : 'open'}` : '—'} />
@@ -334,16 +333,15 @@ export function PersonFormPage() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
-  const { departments, activities } = useOrg();
+  const { activities } = useOrg();
   const typeParam = new URLSearchParams(location.search).get('type') as PersonType | null;
   const existing = useQuery({ queryKey: ['person', id], queryFn: () => api.get<Person>(`/people/${id}`), enabled: editing });
   const [form, setForm] = useState<any>({
     refId: '',
     fullName: '',
     type: typeParam ?? 'GUEST_FACULTY',
-    departmentId: '',
     activityId: '',
-    designation: typeParam === 'SPORTS_COACH' ? 'Coach' : 'Guest Faculty',
+    designation: typeParam === 'SPORTS_COACH' ? 'Coach' : 'Guest Faculty (Physical Education)',
     specialization: '',
     email: '',
     phone: '',
@@ -362,7 +360,6 @@ export function PersonFormPage() {
         refId: p.refId,
         fullName: p.fullName,
         type: p.type,
-        departmentId: p.departmentId ?? '',
         activityId: p.activityId ?? '',
         designation: p.designation ?? '',
         specialization: p.specialization ?? '',
@@ -379,7 +376,6 @@ export function PersonFormPage() {
     mutationFn: () => {
       const body = {
         ...form,
-        departmentId: form.departmentId || null,
         activityId: form.activityId || null,
         joiningDate: form.joiningDate || null,
         contractStart: form.contractStart || null,
@@ -436,22 +432,10 @@ export function PersonFormPage() {
           <Field label="Full name" required error={fe.fullName} className="sm:col-span-2">
             {(p) => <input {...p} className="input" value={form.fullName} onChange={set('fullName')} />}
           </Field>
-          <Field label="Department" required={isGF} error={fe.departmentId}>
-            {(p) => (
-              <select {...p} className="input" value={form.departmentId} onChange={set('departmentId')}>
-                <option value="">{isGF ? 'Select…' : 'None'}</option>
-                {departments.map((d: Department) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-          <Field label="Sport / Activity" required={!isGF} error={fe.activityId}>
+          <Field label="Sport / Activity" required error={fe.activityId}>
             {(p) => (
               <select {...p} className="input" value={form.activityId} onChange={set('activityId')}>
-                <option value="">{!isGF ? 'Select…' : 'None'}</option>
+                <option value="">Select…</option>
                 {activities.map((a: Activity) => (
                   <option key={a.id} value={a.id}>
                     {a.name}
@@ -519,31 +503,22 @@ export function PersonFormPage() {
   );
 }
 
-// ============================================================ Departments & activities
-export function DepartmentsPage() {
-  return <OrgPage kind="departments" />;
-}
+// ============================================================ Sports & activities
 export function ActivitiesPage() {
-  return <OrgPage kind="activities" />;
-}
-
-function OrgPage({ kind }: { kind: 'departments' | 'activities' }) {
   const { can } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const isDept = kind === 'departments';
-  const q = useQuery({ queryKey: [kind, 'all'], queryFn: () => api.get<any[]>(`/${kind}`, { all: true }) });
-  const { departments } = useOrg();
+  const q = useQuery({ queryKey: ['activities', 'all'], queryFn: () => api.get<Activity[]>('/activities', { all: true }) });
   const [edit, setEdit] = useState<any | null>(null);
   const m = useMutation({
     mutationFn: () => {
-      const body = isDept ? { name: edit.name, code: edit.code, status: edit.status } : { name: edit.name, category: edit.category, departmentId: edit.departmentId || null, status: edit.status };
-      return edit.id ? api.patch(`/${kind}/${edit.id}`, body) : api.post(`/${kind}`, body);
+      const body = { name: edit.name, category: edit.category, status: edit.status };
+      return edit.id ? api.patch(`/activities/${edit.id}`, body) : api.post('/activities', body);
     },
     onSuccess: () => {
       toast({ kind: 'success', title: 'Saved' });
       setEdit(null);
-      qc.invalidateQueries({ queryKey: [kind] });
+      qc.invalidateQueries({ queryKey: ['activities'] });
     },
   });
   const fe = fieldErrors(m.error);
@@ -551,12 +526,12 @@ function OrgPage({ kind }: { kind: 'departments' | 'activities' }) {
   return (
     <div>
       <PageHeader
-        eyebrow="People"
-        title={isDept ? 'Departments' : 'Sports & Activities'}
+        title="Sports & Activities"
+        subtitle="Every Guest Faculty member and coach belongs to one sport / activity."
         actions={
           manage && (
-            <Button variant="primary" onClick={() => setEdit(isDept ? { name: '', code: '', status: 'ACTIVE' } : { name: '', category: '', departmentId: '', status: 'ACTIVE' })}>
-              <Plus className="h-4 w-4" /> Add {isDept ? 'department' : 'sport / activity'}
+            <Button variant="primary" onClick={() => setEdit({ name: '', category: '', status: 'ACTIVE' })}>
+              <Plus className="h-4 w-4" /> Add sport / activity
             </Button>
           )
         }
@@ -568,20 +543,11 @@ function OrgPage({ kind }: { kind: 'departments' | 'activities' }) {
           <DataTable
             rows={q.data ?? []}
             rowKey={(r) => r.id}
-            empty={<EmptyState title={`No ${isDept ? 'departments' : 'activities'} yet.`} />}
+            empty={<EmptyState title="No sports or activities yet." />}
             columns={[
               { key: 'name', header: 'Name', sortValue: (r) => r.name, cell: (r) => <span className="font-medium">{r.name}</span> },
-              isDept ? { key: 'code', header: 'Code', cell: (r) => <span className="font-mono text-xs">{r.code}</span> } : { key: 'cat', header: 'Category', sortValue: (r) => r.category, cell: (r) => r.category },
-              ...(!isDept ? [{ key: 'owner', header: 'Owner', cell: (r: any) => r.departmentName ?? '—' }] : []),
-              {
-                key: 'people',
-                header: 'Active personnel',
-                align: 'right' as const,
-                sortValue: (r) => r.activePeople,
-                cell: (r) => (
-                  <Link to={isDept ? `/people/faculty?departmentId=${r.id}` : `/people/coaches?activityId=${r.id}`}>{r.activePeople}</Link>
-                ),
-              },
+              { key: 'cat', header: 'Category', sortValue: (r) => r.category, cell: (r) => r.category },
+              { key: 'people', header: 'Active personnel', align: 'right' as const, sortValue: (r) => r.activePeople, cell: (r) => r.activePeople },
               { key: 'status', header: 'Status', cell: (r) => (r.status === 'ACTIVE' ? 'Active' : <Flag2 tone="gray">Inactive</Flag2>) },
               ...(manage
                 ? [
@@ -589,8 +555,8 @@ function OrgPage({ kind }: { kind: 'departments' | 'activities' }) {
                       key: 'edit',
                       header: <span className="sr-only">Edit</span>,
                       align: 'right' as const,
-                      cell: (r: any) => (
-                        <Button size="sm" variant="ghost" onClick={() => setEdit({ ...r, departmentId: r.departmentId ?? '' })}>
+                      cell: (r: Activity) => (
+                        <Button size="sm" variant="ghost" onClick={() => setEdit({ ...r })}>
                           Edit
                         </Button>
                       ),
@@ -604,7 +570,7 @@ function OrgPage({ kind }: { kind: 'departments' | 'activities' }) {
       <Modal
         open={!!edit}
         onOpenChange={(o) => !o && setEdit(null)}
-        title={edit?.id ? `Edit ${edit.name}` : `Add ${isDept ? 'department' : 'sport / activity'}`}
+        title={edit?.id ? `Edit ${edit.name}` : 'Add sport / activity'}
         footer={
           <>
             <Button onClick={() => setEdit(null)}>Cancel</Button>
@@ -619,29 +585,9 @@ function OrgPage({ kind }: { kind: 'departments' | 'activities' }) {
             <Field label="Name" required error={fe.name} className="sm:col-span-2">
               {(p) => <input {...p} className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />}
             </Field>
-            {isDept ? (
-              <Field label="Code" required error={fe.code} hint="Uppercase, e.g. CSE">
-                {(p) => <input {...p} className="input font-mono" value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value.toUpperCase() })} />}
-              </Field>
-            ) : (
-              <>
-                <Field label="Category" required error={fe.category} hint="e.g. Outdoor, Indoor, Fitness">
-                  {(p) => <input {...p} className="input" value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} />}
-                </Field>
-                <Field label="Owning department / office">
-                  {(p) => (
-                    <select {...p} className="input" value={edit.departmentId} onChange={(e) => setEdit({ ...edit, departmentId: e.target.value })}>
-                      <option value="">None</option>
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </Field>
-              </>
-            )}
+            <Field label="Category" required error={fe.category} hint="e.g. Outdoor, Indoor, Fitness">
+              {(p) => <input {...p} className="input" value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} />}
+            </Field>
             <Field label="Status">
               {(p) => (
                 <select {...p} className="input" value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>

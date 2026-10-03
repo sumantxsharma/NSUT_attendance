@@ -8,7 +8,7 @@ import { ForgotPasswordPage, LoginPage, ResetPasswordPage } from './pages/AuthPa
 import { DashboardPage } from './pages/DashboardPage';
 import { CalendarPage, CorrectionsPage, LivePresencePage, MonthlyPage, TodayAttendancePage } from './pages/AttendancePages';
 import { MyAttendancePage } from './pages/MyAttendancePage';
-import { ActivitiesPage, DepartmentsPage, PeopleListPage, PersonFormPage, PersonProfilePage } from './pages/PeoplePages';
+import { ActivitiesPage, PeopleListPage, PersonFormPage, PersonProfilePage } from './pages/PeoplePages';
 import { LeavePage } from './pages/LeavePage';
 import { ReportPage, ReportsIndexPage } from './pages/ReportsPage';
 import { AuditPage, ProfilePage, RolesPage, RulesPage, SettingsPage, UsersPage } from './pages/AdminPages';
@@ -81,7 +81,6 @@ export function App() {
           <Route path="people/new" element={<Guard perm="people.write"><PersonFormPage /></Guard>} />
           <Route path="people/:id/edit" element={<Guard perm="people.write"><PersonFormPage /></Guard>} />
           <Route path="people/:id" element={<Guard perm="people.read"><PersonProfilePage /></Guard>} />
-          <Route path="departments" element={<Guard perm="people.read"><DepartmentsPage /></Guard>} />
           <Route path="activities" element={<Guard perm="people.read"><ActivitiesPage /></Guard>} />
           <Route path="leave" element={<Guard perm={['leave.self', 'leave.review']}><LeavePage /></Guard>} />
           <Route path="reports" element={<Guard perm="reports.generate"><ReportsIndexPage /></Guard>} />

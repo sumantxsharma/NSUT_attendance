@@ -9,7 +9,7 @@ export type Role = (typeof ROLES)[number];
 export const ROLE_LABELS: Record<Role, string> = {
   SUPER_ADMIN: 'Super Admin',
   OFFICER: 'Authorized Officer',
-  COORDINATOR: 'Department / Activity Coordinator',
+  COORDINATOR: 'Sport / Activity Coordinator',
   STAFF: 'Guest Faculty / Sports Coach',
 };
 
@@ -80,7 +80,6 @@ export const REPORT_TYPES = [
   'daily',
   'monthly',
   'individual',
-  'department',
   'activity',
   'absence',
   'leave',
@@ -93,7 +92,6 @@ export const REPORT_LABELS: Record<ReportType, string> = {
   daily: 'Daily Attendance Report',
   monthly: 'Monthly Attendance Report',
   individual: 'Individual Attendance Report',
-  department: 'Department-wise Report',
   activity: 'Sports / Activity-wise Report',
   absence: 'Absence Report',
   leave: 'Leave Report',
@@ -133,8 +131,6 @@ export const AUDIT_ACTIONS = [
   'USER_DEACTIVATE',
   'USER_ACTIVATE',
   'USER_RESET_LINK_ISSUED',
-  'DEPARTMENT_CREATE',
-  'DEPARTMENT_UPDATE',
   'ACTIVITY_CREATE',
   'ACTIVITY_UPDATE',
   'SETTINGS_RULES_UPDATE',

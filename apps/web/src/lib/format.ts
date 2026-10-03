@@ -7,8 +7,8 @@ export const pct = (v: number | null | undefined) => (v === null || v === undefi
 
 export const typeLabel = (t: PersonType) => PERSON_TYPE_LABELS[t];
 
-export function unitName(p: { type: PersonType; departmentName: string | null; activityName: string | null }) {
-  return p.type === 'SPORTS_COACH' ? (p.activityName ?? '—') : (p.departmentName ?? '—');
+export function unitName(p: { activityName: string | null }) {
+  return p.activityName ?? '—';
 }
 
 export function monthLabel(year: number, month: number) {

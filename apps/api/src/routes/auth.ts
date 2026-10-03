@@ -39,8 +39,7 @@ async function mePayload(userId: string, csrf: string) {
     [userId],
   );
   const scopes = await pool.query(
-    `SELECT s.department_id AS "departmentId", d.name AS "departmentName", s.activity_id AS "activityId", a.name AS "activityName"
-     FROM user_scopes s LEFT JOIN departments d ON d.id = s.department_id LEFT JOIN activities a ON a.id = s.activity_id WHERE s.user_id = $1`,
+    `SELECT s.activity_id AS "activityId", a.name AS "activityName" FROM user_scopes s JOIN activities a ON a.id = s.activity_id WHERE s.user_id = $1`,
     [userId],
   );
   return { user: { ...u, permissions: ROLE_PERMISSIONS[u.role as keyof typeof ROLE_PERMISSIONS], scopes: scopes.rows }, csrfToken: csrf };

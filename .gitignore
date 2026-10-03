@@ -1,9 +1,8 @@
 node_modules
 dist
 .env
-uploads/*
-!uploads/.gitkeep
 test-results
 playwright-report
 *.log
 backups/
+.vercel

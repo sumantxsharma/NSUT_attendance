@@ -5,7 +5,7 @@
 ```
  Browser (React SPA)  ──HTTPS──▶  Nginx (TLS, optional)  ──▶  Node.js API (Express)  ──▶  PostgreSQL 16
         │                                                        │
-        │  same-origin cookies + CSRF header                     ├── uploads/ (photos, leave documents, logo)
+        │  same-origin cookies + CSRF header                     ├── stored_files table (photos, leave documents, logo)
         │                                                        └── notification_outbox (email/SMS later)
         └── static assets served by the API in production
 ```

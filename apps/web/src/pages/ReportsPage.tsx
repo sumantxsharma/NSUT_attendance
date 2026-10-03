@@ -17,8 +17,7 @@ const DESCRIPTIONS: Record<ReportType, string> = {
   daily: 'Everyone’s status, in/out time and duration for one date.',
   monthly: 'Working days, present, absent, leave, half days and attendance % per person.',
   individual: 'Day-by-day attendance for one person for a month.',
-  department: 'Guest Faculty attendance aggregated by department.',
-  activity: 'Sports Coach attendance aggregated by sport / activity.',
+  activity: 'Guest Faculty and coach attendance aggregated by sport / activity.',
   absence: 'Working days recorded absent or left unmarked.',
   leave: 'Leave requests in a period, with status and reviewer.',
   late: 'Check-ins after office start + grace period.',
@@ -27,7 +26,7 @@ const DESCRIPTIONS: Record<ReportType, string> = {
 };
 
 type Mode = 'date' | 'month' | 'range';
-const MODE: Record<ReportType, Mode> = { daily: 'date', monthly: 'month', individual: 'month', department: 'month', activity: 'month', absence: 'range', leave: 'range', late: 'range', early: 'range', incomplete: 'range' };
+const MODE: Record<ReportType, Mode> = { daily: 'date', monthly: 'month', individual: 'month', activity: 'month', absence: 'range', leave: 'range', late: 'range', early: 'range', incomplete: 'range' };
 
 export function ReportsIndexPage() {
   return (
@@ -63,7 +62,6 @@ export function ReportPage() {
   const monthStart = DateTime.fromObject({ year: now.year, month: now.month, day: 1 }).toISODate()!;
   const params: Record<string, string | undefined> = {
     type: f.type,
-    departmentId: f.departmentId,
     activityId: f.activityId,
     personId: f.personId,
     status: f.status,
@@ -87,8 +85,8 @@ export function ReportPage() {
     }
   };
   const r = q.data;
-  const filterShow: ('q' | 'type' | 'department' | 'activity' | 'status' | 'person')[] =
-    rtype === 'individual' ? ['type', 'person'] : rtype === 'department' ? ['department'] : rtype === 'activity' ? ['activity'] : rtype === 'daily' ? ['type', 'department', 'activity', 'status'] : rtype === 'leave' ? ['type', 'department', 'activity', 'person', 'status'] : ['type', 'department', 'activity', 'person'];
+  const filterShow: ('q' | 'type' | 'activity' | 'status' | 'person')[] =
+    rtype === 'individual' ? ['type', 'person'] : rtype === 'activity' ? ['type', 'activity'] : rtype === 'daily' ? ['type', 'activity', 'status'] : rtype === 'leave' ? ['type', 'activity', 'person', 'status'] : ['type', 'activity', 'person'];
   const statusOptions = rtype === 'leave' ? ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].map((s) => ({ value: s, label: s[0] + s.slice(1).toLowerCase() })) : undefined;
 
   return (

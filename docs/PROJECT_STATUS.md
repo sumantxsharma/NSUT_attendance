@@ -44,9 +44,9 @@ Last full run, from clean build outputs:
 | Approved leave affects attendance | ✅ | leave test (LEAVE_SYNC rows, cancellation reverts), E2E step 10 |
 | Dashboard is dynamic | ✅ | test changes data and sees the counts change |
 | Live presence works | ✅ | UI (30 s refresh), daily sheet API test |
-| Search works | ✅ | search test (ref ID, sport, department, literal `%`) |
+| Search works | ✅ | search test (ref ID, sport, literal `%`) |
 | Filters work | ✅ | monthly/daily filters, URL-synced in the UI |
-| Department filtering works | ✅ | people/coordinator scope tests |
+| Sport/activity filtering works | ✅ | people/coordinator scope tests |
 | Sport/activity filtering works | ✅ | monthly `type` filter, coordinator (sports) report test |
 | Reports work | ✅ | all 10 report types via API |
 | CSV export works | ✅ | API test (formula-injection guard), E2E download |
@@ -77,7 +77,7 @@ Last full run, from clean build outputs:
   - first-admin bootstrap script
   - SSO extension point
 - RBAC with 4 roles and 18 permissions; row-level scope for coordinators and staff.
-- People: Guest Faculty and Sports Coaches with photos, contracts and assigned hours; departments; sports and activities; activation/deactivation.
+- People: Guest Faculty and Sports Coaches with photos, contracts and assigned hours, organised by sport / activity; activation/deactivation.
 - Attendance:
   - self check-in/out on server time
   - manual marking with a confirmation step
@@ -86,7 +86,7 @@ Last full run, from clean build outputs:
   - late, early and incomplete flags
   - auto half-day/absent classification
 - Rule engine: per-type timings and working days; configurable leave, holiday and weekend handling; half-day weight; formula shown to users.
-- Views: dashboard (overview, % vs last month, live table, 30-day trend chart, department/sport summary, recent activity, needs-attention), today's sheet, live presence, calendar, monthly records, corrections.
+- Views: dashboard (overview, % vs last month, live table, 30-day trend chart, sport/activity summary, needs-attention), today's sheet, live presence, calendar, monthly records, corrections.
 - Leave: request with document upload, approve/reject/cancel, automatic attendance sync and revert, overlap protection.
 - Reports: 10 types with preview, print stylesheet, CSV/XLSX/PDF exports, logo placeholder or uploaded logo, page numbers and signature line.
 - Audit log: append-only (database trigger), before/after snapshots, filters, detail view.
@@ -101,7 +101,7 @@ These are deliberate for V1 and documented:
 1. **No outbound email or SMS delivery.** Messages are queued in `notification_outbox`. Password reset relies on admin-issued links until a mail worker is added.
 2. **No scheduled jobs.** "Attendance missing" and "contract expiring" are shown on the dashboard, but no push notifications are generated on a timer.
 3. **No leave balances or quotas.** Leave rules are limited to maximum days per request and allowed backdating.
-4. **Uploads are stored on local disk.** A multi-server deployment needs shared storage or an object-storage adapter.
+4. **Uploads are stored in PostgreSQL** (`stored_files`, up to 5 MB each). Fine at this scale; move to object storage if volumes grow large.
 5. **Light theme only**; no dark mode.
 6. **Check-out must happen on the same institutional date as check-in.** Overnight shifts would need a rule change.
 7. **Browser coverage.** E2E runs on Chromium only; Firefox and Safari were not automated.
@@ -126,14 +126,14 @@ These are deliberate for V1 and documented:
 5. Upload the official logo supplied by the University.
 6. Configure daily off-host backups and test a restore.
 7. Publish a privacy notice (including IP/user-agent logging, or set `RECORD_CLIENT_META=false`).
-8. Pilot with one department and one sport for 2–4 weeks before campus-wide rollout.
+8. Pilot with one or two sports for 2–4 weeks before campus-wide rollout.
 
 ## Recommended next steps
 
 1. Email worker for `notification_outbox` (SMTP through the University mail relay).
 2. Nightly job: flag missing check-outs, notify coordinators of unmarked staff, contract-expiry reminders.
 3. Institutional SSO (OIDC/SAML) using the existing `auth_provider` hook.
-4. QR check-in at department offices or grounds, as a new `marking_method` with rotating codes. Avoid GPS or biometrics unless separately approved.
+4. QR check-in at the sports office or grounds, as a new `marking_method` with rotating codes. Avoid GPS or biometrics unless separately approved.
 5. Leave balances per type and academic year.
 6. Monthly honorarium/payroll export built on credits and hours.
 7. Firefox and WebKit E2E projects in CI; GitHub Actions or GitLab CI pipeline running lint, typecheck, tests and the Docker build.

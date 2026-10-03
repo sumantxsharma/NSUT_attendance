@@ -6,7 +6,7 @@ import type { Params } from './sql';
 /**
  * Row-level visibility of people for the current user.
  * - SUPER_ADMIN / OFFICER: everyone
- * - COORDINATOR: people in assigned departments or activities
+ * - COORDINATOR: people in assigned sports / activities
  * - STAFF: only their own profile
  * Returns a SQL predicate on the given people alias.
  */
@@ -17,9 +17,9 @@ export function peopleScopeSql(req: Request, p: Params, alias = 'p'): string {
     case 'OFFICER':
       return 'TRUE';
     case 'COORDINATOR': {
-      const { departmentIds, activityIds } = auth.scope;
-      if (departmentIds.length === 0 && activityIds.length === 0) return 'FALSE';
-      return `(${alias}.department_id = ANY(${p.add(departmentIds)}::uuid[]) OR ${alias}.activity_id = ANY(${p.add(activityIds)}::uuid[]))`;
+      const { activityIds } = auth.scope;
+      if (activityIds.length === 0) return 'FALSE';
+      return `${alias}.activity_id = ANY(${p.add(activityIds)}::uuid[])`;
     }
     case 'STAFF':
     default:
@@ -29,8 +29,8 @@ export function peopleScopeSql(req: Request, p: Params, alias = 'p'): string {
 
 /** Throws 404 if the person doesn't exist, 403 if outside the caller's scope. */
 export async function assertPersonVisible(req: Request, personId: string) {
-  const person = await one<{ id: string; department_id: string | null; activity_id: string | null }>(
-    'SELECT id, department_id, activity_id FROM people WHERE id = $1 AND deleted_at IS NULL',
+  const person = await one<{ id: string; activity_id: string | null }>(
+    'SELECT id, activity_id FROM people WHERE id = $1 AND deleted_at IS NULL',
     [personId],
   );
   if (!person) throw notFound('Person');
@@ -40,9 +40,6 @@ export async function assertPersonVisible(req: Request, personId: string) {
     if (auth.user.personId !== personId) throw forbidden();
     return person;
   }
-  const ok =
-    (person.department_id && auth.scope.departmentIds.includes(person.department_id)) ||
-    (person.activity_id && auth.scope.activityIds.includes(person.activity_id));
-  if (!ok) throw forbidden('You do not have access to this department or activity.');
+  if (!person.activity_id || !auth.scope.activityIds.includes(person.activity_id)) throw forbidden('You do not have access to this sport / activity.');
   return person;
 }
