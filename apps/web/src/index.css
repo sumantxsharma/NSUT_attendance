@@ -1,0 +1,187 @@
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans/700.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas text-[#111827] font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid #1f4e8c;
+    outline-offset: 2px;
+  }
+  a {
+    @apply text-brand-700;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply text-ink;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded border px-3.5 h-9 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap select-none;
+  }
+  .btn-primary {
+    @apply btn border-brand-700 bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn border-line bg-white text-ink hover:bg-[#F0F2F5];
+  }
+  .btn-ghost {
+    @apply btn border-transparent bg-transparent text-ink hover:bg-[#EDEFF3];
+  }
+  .btn-danger {
+    @apply btn border-[#8f1d17] bg-st-absent text-white hover:bg-[#8f1d17];
+  }
+  .btn-sm {
+    @apply h-8 px-2.5 text-[13px];
+  }
+  .input {
+    @apply block w-full rounded border border-[#C5CBD4] bg-white px-3 h-9 text-sm text-[#111827] placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-[#F3F4F6] disabled:text-muted;
+  }
+  textarea.input {
+    @apply h-auto py-2;
+  }
+  .label {
+    @apply mb-1 block text-[13px] font-medium text-ink;
+  }
+  .panel {
+    @apply rounded-md border border-line bg-white;
+  }
+  .panel-head {
+    @apply flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3;
+  }
+  .panel-title {
+    @apply text-[15px] font-semibold text-ink;
+  }
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+  .table th {
+    @apply border-b border-line bg-[#F7F8FA] px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-muted whitespace-nowrap;
+  }
+  .table td {
+    @apply border-b border-[#ECEEF2] px-3 py-2.5 align-middle;
+  }
+  .table tbody tr:hover td {
+    @apply bg-[#FAFBFC];
+  }
+  .kbd {
+    @apply rounded border border-line bg-[#F7F8FA] px-1.5 py-0.5 font-mono text-2xs text-muted;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #eceef2 0%, #f5f6f8 50%, #eceef2 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+  border-radius: 4px;
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- print */
+.print-only {
+  display: none;
+}
+@page {
+  size: A4 landscape;
+  margin: 14mm 12mm 16mm 12mm;
+  @bottom-right {
+    content: 'Page ' counter(page) ' of ' counter(pages);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 8pt;
+    color: #5b6472;
+  }
+  @bottom-left {
+    content: 'NSUT Attendance & Presence — system-generated report';
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 8pt;
+    color: #5b6472;
+  }
+}
+@media print {
+  body {
+    background: #fff !important;
+    font-size: 10pt;
+  }
+  .no-print,
+  [data-noprint] {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .panel {
+    border: none !important;
+  }
+  .table th {
+    background: #1b2a41 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .table td,
+  .table th {
+    padding: 4px 6px !important;
+    font-size: 8.5pt;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+/* Links inside running text must not rely on colour alone (WCAG 1.4.1). */
+p a:not([class*='btn']),
+li > p a:not([class*='btn']),
+dd a:not([class*='btn']),
+span > a:not([class*='btn']) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

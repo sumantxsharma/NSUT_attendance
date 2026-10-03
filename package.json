@@ -1,0 +1,36 @@
+{
+  "name": "nsut-attendance-presence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NSUT Attendance & Presence — Guest Faculty & Sports Coach Monitoring System",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @nsut/api & npm run dev -w @nsut/web",
+    "build": "npm run build -w @nsut/web && npm run build -w @nsut/api",
+    "start": "npm run start -w @nsut/api",
+    "db:migrate": "npm run db:migrate -w @nsut/api",
+    "db:seed": "npm run db:seed -w @nsut/api",
+    "db:reset": "npm run db:reset -w @nsut/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "test": "npm run test -w @nsut/shared && npm run test -w @nsut/api",
+    "test:e2e": "playwright test -c tests/playwright.config.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.56",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.12.0",
+    "typescript": "5.6",
+    "typescript-eslint": "^8.70.1"
+  },
+  "type": "module"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "NSUT Attendance & Presence",
+  "short_name": "NSUT Attendance",
+  "description": "Guest Faculty & Sports Coach Monitoring System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F6F8",
+  "theme_color": "#15233A",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
